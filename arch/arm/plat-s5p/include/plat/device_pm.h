@@ -1,0 +1,40 @@
+#ifndef _SYSTEM_PM_H_
+#define _SYSTEM_PM_H_
+
+typedef enum {
+    PM_DEVICE_DEBUG = 0x00,              /**/
+    PM_DEVICE_MODEM,
+    PM_DEVICE_BT,
+    PM_DEVICE_GPS,
+    PM_DEVICE_CMMB,
+    PM_DEVICE_TP,
+    PM_DEVICE_LCD,
+    PM_DEVICE_BACKLIGHT,
+    PM_DEVICE_LED,
+    PM_DEVICE_USB_OTG,
+    PM_DEVICE_USB_HOST,
+    PM_DEVICE_AUDIO,
+    PM_DEVICE_AUDIOSPK,
+    PM_DEVICE_CAM_FRONT,
+    PM_DEVICE_CAM_MAIN,
+    PM_DEVICE_GSENSOR,
+    PM_DEVICE_SD,
+    PM_DEVICE_WIFI,
+    PM_DEVICE_ECOMPASS,
+    PM_DEVICE_ACCEL,
+    PM_DEVICE_MOUSE,
+    PM_DEVICE_VIBRATOR,
+    PM_DEVICE_HDMI,
+    PM_DEVICE_TVOUT,
+    /* Your PMIC_DEVICE_XXX Here !!! */
+    PM_DEVICE_TOTAL,
+}PM_DEVICE_TYPE;
+
+#define PM_CONTROL_VAL_OFF	0
+#define PM_CONTROL_VAL_ON		1
+#define PM_CONTROL_VAL_BOOT_OFF	2
+
+int Device_PM_Control(PM_DEVICE_TYPE type, unsigned int val);
+
+#endif /*_device_PM_H_*/
+

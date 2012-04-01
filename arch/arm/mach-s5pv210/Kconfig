@@ -1,0 +1,321 @@
+# arch/arm/mach-s5pv210/Kconfig
+#
+# Copyright (c) 2010 Samsung Electronics Co., Ltd.
+#		http://www.samsung.com/
+#
+# Licensed under GPLv2
+
+# Configuration options for the S5PV210/S5PC110
+
+if ARCH_S5PV210
+
+config CPU_S5PV210
+	bool
+	select PLAT_S5P
+	select S3C_PL330_DMA
+	select S5P_EXT_INT
+	help
+	  Enable S5PV210 CPU support
+
+config S5PV210_SETUP_I2C1
+	bool
+	depends on S3C_DEV_I2C1
+	default	y
+	help
+	  Common setup code for i2c bus 1.
+
+config S5PV210_SETUP_I2C2
+	bool
+	depends on S3C_DEV_I2C2
+	default	y
+	help
+	  Common setup code for i2c bus 2.
+
+config S5PV210_SETUP_FB_24BPP
+	bool
+	help
+          Common setup code for S5PV210 with an 24bpp RGB display helper.
+
+config S5PV210_SETUP_SDHCI
+        bool
+        select S5PV210_SETUP_SDHCI_GPIO
+        help
+          Internal helper functions for S5PV210 based SDHCI systems
+
+config S5PV210_SETUP_SDHCI_GPIO
+	bool
+	help
+	  Common setup code for SDHCI gpio.
+
+config S5PV210_POWER_DOMAIN
+	bool
+	depends on REGULATOR
+	default y
+	help
+	  Enable S5PV210 power domain support.
+
+# machine support
+choice
+	prompt "Board selection"
+
+config MACH_AQUILA
+	bool "Samsung Aquila"
+	select CPU_S5PV210
+	select ARCH_SPARSEMEM_ENABLE
+	select S5PV210_SETUP_FB_24BPP
+	select S3C_DEV_FB
+	help
+	  Machine support for the Samsung Aquila target based on S5PC110 SoC
+
+config MACH_GONI
+	bool "GONI"
+	select CPU_S5PV210
+	select ARCH_SPARSEMEM_ENABLE
+	help
+	  Machine support for Samsung GONI board
+	  S5PC110(MCP) is one of package option of S5PV210
+
+config MACH_SMDKV210
+	bool "SMDKV210"
+	select CPU_S5PV210
+	select ARCH_SPARSEMEM_ENABLE
+	select S3C_DEV_WDT
+	select HAVE_S3C2410_WATCHDOG
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C2
+	select HAVE_PWM
+	select S3C_DEV_HSMMC
+	select S3C_DEV_HSMMC1 if !S5PV210_SD_CH0_8BIT
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3 if !S5PV210_SD_CH2_8BIT
+	select S5PV210_SETUP_SDHCI
+	select S5PV210_POWER_DOMAIN
+	help
+	  Machine support for Samsung SMDKV210
+
+config MACH_SMDKC110
+	bool "SMDKC110"
+	select CPU_S5PV210
+	select ARCH_DISCONTIGMEM_ENABLE
+	select S3C_DEV_WDT
+	select HAVE_S3C2410_WATCHDOG
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C2
+	select HAVE_PWM
+	select ARCH_HAS_CPUFREQ
+	select S3C_DEV_HSMMC
+	select S3C_DEV_HSMMC1 if !S5PV210_SD_CH0_8BIT
+	select S3C_DEV_HSMMC3 if !S5PV210_SD_CH2_8BIT
+	select S5PV210_SETUP_SDHCI
+	select S5PV210_POWER_DOMAIN
+	help
+	  Machine support for Samsung SMDKC110
+	  S5PC110(MCP) is one of package option of S5PV210
+
+config MACH_T34
+	bool "HZSSCR T34"
+	select CPU_S5PV210
+	select ARCH_SPARSEMEM_ENABLE
+	select S3C_DEV_WDT
+	select HAVE_S3C2410_WATCHDOG
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C2
+	select HAVE_PWM
+	select S3C_DEV_HSMMC
+        select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC1 if !S5PV210_SD_CH0_8BIT	
+	select S3C_DEV_HSMMC3 if !S5PV210_SD_CH2_8BIT
+	select S5PV210_SETUP_SDHCI
+	select S5PV210_POWER_DOMAIN
+	help
+	  Machine support for Samsung HZSSCR T34
+
+config MACH_HERRING
+	bool "Herring"
+	select CPU_S5PV210
+	select ARCH_DISCONTIGMEM_ENABLE
+	select S3C_DEV_WDT
+	select HAVE_S3C2410_WATCHDOG
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C2
+	select HAVE_PWM
+	select ARCH_HAS_CPUFREQ
+	select S3C_DEV_HSMMC
+	select S3C_DEV_HSMMC1 if !S5PV210_SD_CH0_8BIT
+	select S3C_DEV_HSMMC3 if !S5PV210_SD_CH2_8BIT
+	select S5PV210_SETUP_SDHCI
+	select S5PV210_POWER_DOMAIN
+	help
+	  Machine support for Herring
+
+endchoice
+
+choice
+	prompt "Select DMC0 memory type for S5PC110"
+	depends on MACH_SMDKC110
+	default S5PC110_MEM_DMC0_ONEDRAM
+
+config S5PC110_MEM_DMC0_ONEDRAM
+	bool "OneDRAM"
+	help
+	  If you have S5PC110 B-Type or D-Type, select it
+
+config S5PC110_MEM_DMC0_MDDR
+	bool "mDDR"
+	help
+	  If you have S5PC110 H-Type or N-Type, select it
+
+endchoice
+
+#add by urbetter
+choice
+        prompt "setup memory"
+        depends on CPU_S5PV210
+				default URBETTER_MEM_512MB_2BANK
+
+config URBETTER_MEM_1GB_2BANK
+        bool "memory config as 1GB 2 bank"
+        help
+					Select memory config as 1GB
+
+config URBETTER_MEM_512MB_2BANK
+        bool "memory config as 512MB 2 bank"
+        help
+					Select memory config as 512MB
+endchoice
+choice
+	prompt "Select board revision number for SMDKC110"
+	depends on MACH_SMDKC110
+	default SMDKC110_REV01
+
+config SMDKC110_REV01
+	bool "SMDKC110 Rev 0.1 or 0.2"
+	help
+	  If you have SMDKC110 CPU board revision 0.1 or 0.2, select it.
+
+config SMDKC110_REV03
+	bool "SMDKC110 Rev 0.3"
+	help
+	  If you have SMDKC110 CPU board revision 0.3, select it.
+
+endchoice
+
+choice
+	prompt "Select board revision number for SMDKV210"
+	depends on MACH_SMDKV210
+	default SMDKV210_REV01
+
+config SMDKV210_REV01
+	bool "SMDKV210 Rev 0.1"
+	help
+	  If you have SMDKV210 CPU board revision 0.1 or 0.2, select it.
+
+config SMDKV210_REV02
+	bool "SMDKV210 Rev 0.2"
+	help
+	  If you have SMDKV210 CPU board revision 0.2 and max8998 PMIC, select it.
+
+endchoice
+
+choice
+	prompt "Select board revision number for HZSSCR T34"
+	depends on MACH_T34
+	default T34_REV01
+
+config T34_REV01
+	bool "T34 Rev 0.1"
+	help
+	  If you have T34 board revision 0.1, select it.
+
+config T34_REV02
+	bool "T34 Rev 0.2"
+	help
+	  If you have T34 board revision 0.2, select it.
+
+endchoice
+
+config DM9000_16BIT
+	bool "DM9000 16-bit"
+	depends on MACH_SMDKV210 || MACH_VOGUEV210 || MACH_SMDKC110 || MACH_T34
+	default n
+	help
+	  Support DM9000 ethernet controller with 16bit data bus
+
+config S5PV210_SETUP_SDHCI
+	bool
+	depends on PLAT_S5P
+	default y
+	help
+	  Internal helper functions for S5PCV210 based SDHCI systems
+comment "MMC/SD slot setup"
+depends on PLAT_S5P
+menu "Use 8-bit bus width"
+config S5PV210_SD_CH0_8BIT
+bool "Channel 0"
+depends on PLAT_S5P
+default n
+help
+IF channel 0 uses 8-bit bus, channel 1 is disabled.
+
+
+config S5PV210_SD_CH2_8BIT
+bool "Channel 2"
+depends on PLAT_S5P
+default n
+help
+IF channel 2 uses 8-bit bus, channel 3 is disabled.
+endmenu
+
+config S5PC110_DEV_ONENAND
+	bool
+	default y if CPU_S5PV210
+	help
+	  Compile in platform device definition for OneNAND1 controller
+
+config S5PV210_SETUP_FB
+	bool
+	depends on FB_S3C
+	default y
+	help
+	  Common setup code for FIMD controller.
+
+config S5P_ADC
+	bool	"S5PXXXX ADC driver"
+	depends on PLAT_S5P
+	default y
+	help
+	  ADC ( A/D Conversion ) driver for Samsung S5PXXXX
+
+config S5PV210_SETUP_FIMC0
+	bool
+	depends on VIDEO_FIMC
+	default y
+	help
+	  Common setup code for FIMC controller 0.
+
+config S5PV210_SETUP_FIMC1
+	bool
+	depends on VIDEO_FIMC
+	default y
+	help
+	  Common setup code for FIMC controller 1.
+
+config S5PV210_SETUP_FIMC2
+	bool
+	depends on VIDEO_FIMC
+	default y
+	help
+	  Common setup code for FIMC controller 2.
+
+config S5PV210_SETUP_CSIS
+	bool
+	depends on VIDEO_FIMC
+	default y
+	help
+	  Common setup code for MIPI-CSIS
+
+config WIFI_CONTROL_FUNC
+       bool "Enable WiFi control function abstraction"
+       help
+         Enables Power/Reset/Carddetect function abstraction
+endif

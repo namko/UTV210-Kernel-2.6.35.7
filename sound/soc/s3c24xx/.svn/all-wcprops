@@ -1,0 +1,53 @@
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/svn/utv210/!svn/ver/743/2.3/kernel/branches/master_system/sound/soc/s3c24xx
+END
+Kconfig
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/svn/utv210/!svn/ver/497/2.3/kernel/branches/master_system/sound/soc/s3c24xx/Kconfig
+END
+smdkv2xx_wm8580slv.c
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/svn/utv210/!svn/ver/375/2.3/kernel/branches/master_system/sound/soc/s3c24xx/smdkv2xx_wm8580slv.c
+END
+s3c64xx-i2s-v4.c
+K 25
+svn:wc:ra_dav:version-url
+V 93
+/svn/utv210/!svn/ver/497/2.3/kernel/branches/master_system/sound/soc/s3c24xx/s3c64xx-i2s-v4.c
+END
+smdkv2xx_wm8976.c
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/svn/utv210/!svn/ver/743/2.3/kernel/branches/master_system/sound/soc/s3c24xx/smdkv2xx_wm8976.c
+END
+s3c-i2s-v2.c
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/svn/utv210/!svn/ver/497/2.3/kernel/branches/master_system/sound/soc/s3c24xx/s3c-i2s-v2.c
+END
+smdkv2xx_rt5621.c
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/svn/utv210/!svn/ver/497/2.3/kernel/branches/master_system/sound/soc/s3c24xx/smdkv2xx_rt5621.c
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/utv210/!svn/ver/497/2.3/kernel/branches/master_system/sound/soc/s3c24xx/Makefile
+END
+s3c-i2s-v2.h
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/svn/utv210/!svn/ver/153/2.3/kernel/branches/master_system/sound/soc/s3c24xx/s3c-i2s-v2.h
+END
