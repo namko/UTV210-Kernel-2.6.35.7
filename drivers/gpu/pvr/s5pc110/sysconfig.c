@@ -97,14 +97,10 @@ IMG_UINT32   PVRSRV_BridgeDispatchKM( IMG_UINT32  Ioctl,
 
 #if defined(SLSI_S5PC110)
 static struct clk		*g3d_clock;
-#ifdef CONFIG_S5PV210_POWER_DOMAIN
 static struct regulator		*g3d_pd_regulator;
-#endif
 static PVRSRV_ERROR EnableSGXClocks(void)
 {
-#ifdef CONFIG_S5PV210_POWER_DOMAIN
 	regulator_enable(g3d_pd_regulator);
-#endif
 	clk_enable(g3d_clock);
 
 	return PVRSRV_OK;
@@ -113,9 +109,7 @@ static PVRSRV_ERROR EnableSGXClocks(void)
 static PVRSRV_ERROR DisableSGXClocks(void)
 {
 	clk_disable(g3d_clock);
-#ifdef CONFIG_S5PV210_POWER_DOMAIN
 	regulator_disable(g3d_pd_regulator);
-#endif
 
 	return PVRSRV_OK;
 }
@@ -183,13 +177,12 @@ PVRSRV_ERROR SysInitialise()
 	OSMemSet(gpsSysData, 0, sizeof(SYS_DATA));
 
 	pdev = gpsPVRLDMDev;
-#ifdef CONFIG_S5PV210_POWER_DOMAIN
 	g3d_pd_regulator = regulator_get(&pdev->dev, "pd");
 	if (IS_ERR(g3d_pd_regulator)) {
 		printk("\nG3D failed to find g3d power domain\n");
 		return PVRSRV_ERROR_INIT_FAILURE;
 	}
-#endif
+
 	g3d_clock = clk_get(&pdev->dev, "sclk");
 	if (IS_ERR(g3d_clock)) {
 		printk("\n3D failed to find g3d clock source-enable\n");
@@ -794,16 +787,3 @@ PVRSRV_ERROR SysOEMFunction(IMG_UINT32	ui32ID,
 
 	return PVRSRV_ERROR_INVALID_PARAMS;
 }
-
-
-PVRSRV_ERROR SysPowerLockWrap(SYS_DATA unref__ *psSysData)
-{                                                               
-	return PVRSRV_OK;                                       
-}                                                               
-                                                                
-IMG_VOID SysPowerLockUnwrap(SYS_DATA unref__ *psSysData)
-{                                                               
-}                                                               
-
-
-

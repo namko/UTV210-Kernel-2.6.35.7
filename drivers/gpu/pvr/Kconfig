@@ -1,3 +1,4 @@
+
 config PVR_SGX
 	tristate "PowerVR SGX support"
 	depends on ARCH_S5PV210
@@ -6,6 +7,16 @@ config PVR_SGX
 
 	  To compile this driver as a module, choose M here:
 	  this will generate two modules, called pvrsrvkm and s3c_lcd.
+
+choice
+	prompt "PowerVR SGX core"
+	depends on PVR_SGX
+	default PVR_SGXCORE_540
+
+config PVR_SGXCORE_540
+	bool "SGX 540"
+
+endchoice
 
 choice
 	prompt "PowerVR build type"

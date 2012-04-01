@@ -19,19 +19,19 @@ ccflags-y += -DLINUX -D__linux__ -DANDROID
 ccflags-y += -Idrivers/gpu/pvr
 
 ccflags-y += \
+	-DSUPPORT_SGX \
+	-DTRANSFER_QUEUE \
+	-DSUPPORT_HW_RECOVERY \
+	-DLDM_PLATFORM \
 	-DSUPPORT_SGX_NEW_STATUS_VALS \
 	-DSUPPORT_SGX_HWPERF \
 	-DSYS_USING_INTERRUPTS \
 	-DPVR_SECURE_HANDLES \
 	-DSERVICES4 \
 	-DSUPPORT_SGX_EVENT_OBJECT \
-	-DTRANSFER_QUEUE \
-	-DSUPPORT_SGX \
 	-DSUPPORT_SRVINIT \
-	-DSUPPORT_HW_RECOVERY \
 	-DPVR_SECURE_FD_EXPORT \
 	-DSUPPORT_SGX_EVENT_OBJECT \
-	-DLDM_PLATFORM \
 	-DPVR2D_ALT_2DHW \
 	-DPVR_LINUX_USING_WORKQUEUES \
 	-DPVR_LINUX_MISR_USING_PRIVATE_WORKQUEUE \
@@ -41,6 +41,7 @@ ccflags-y += \
 	-DSYS_SGX_ACTIVE_POWER_LATENCY_MS=100 \
 	-DPVR_BUILD_DATE="" \
 	-DPVRSRV_MODNAME="\"pvrsrvkm\"" \
+	-DPVR_LDM_DRIVER_REGISTRATION_NAME="\"pvrsrvkm\"" \
 	-Idrivers/gpu/pvr/sgx \
  	-DPVRSRV_RESET_ON_HWTIMEOUT
 
@@ -129,13 +130,8 @@ s3c_lcd-y := \
 	s3c_lcd/s3c_displayclass.o \
 	s3c_lcd/s3c_lcd.o
 
-s3c_bc-y := \
-	s3c_bc/s3c_bc.o \
-	s3c_bc/s3c_bc_linux.o
-
 obj-$(CONFIG_PVR_PDUMP) += dbgdrv
 
 obj-$(CONFIG_PVR_SGX) += pvrsrvkm.o
 
 obj-$(CONFIG_ARCH_S5PV210) += s3c_lcd.o
-obj-$(CONFIG_ARCH_S5PV210) += s3c_bc.o
