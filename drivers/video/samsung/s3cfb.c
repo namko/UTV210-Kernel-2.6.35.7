@@ -761,17 +761,7 @@ static void s3cfb_init_fbinfo(struct s3cfb_global *ctrl, int id)
 				(var->upper_margin + var->lower_margin +
 				var->vsync_len + var->yres);
 
-#if defined(CONFIG_FB_S3C_LTE480WV)
-	/* LTE480WV LCD Device tunning.
-	 * To avoid LTE480WV LCD flickering
-	 */
-	//var->pixclock *= 2;
-	/* *2 pixclock too larger to flicker*/
-	var->pixclock *= 3;
-	var->pixclock /= 2;
-
-#endif
-
+    // namko: Removed the 1.5x multiplier for LTE480WV.
 	dev_dbg(ctrl->dev, "pixclock: %d\n", var->pixclock);
 
 	s3cfb_set_bitfield(var);

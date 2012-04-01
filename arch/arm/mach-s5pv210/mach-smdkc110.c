@@ -678,15 +678,16 @@ static struct s3cfb_lcd lte480wv = {
 	.bpp = 32,
 	.freq = 60,
 
+    // namko: Fix LCD timings.
 	.timing = {
-		.h_fp = 8,
-		.h_bp = 13,
-		.h_sw = 3,
-		.v_fp = 5,
+		.h_fp = 10,
+		.h_bp = 78,
+		.h_sw = 10,
+		.v_fp = 30,
 		.v_fpe = 1,
-		.v_bp = 7,
+		.v_bp = 30,
 		.v_bpe = 1,
-		.v_sw = 1,
+		.v_sw = 2,
 	},
 	.polarity = {
 		.rise_vclk = 0,
@@ -698,76 +699,30 @@ static struct s3cfb_lcd lte480wv = {
 
 static void lte480wv_cfg_gpio(struct platform_device *pdev)
 {
-	int i;
-
-	for (i = 0; i < 8; i++) {
-		s3c_gpio_cfgpin(S5PV210_GPF0(i), S3C_GPIO_SFN(2));
-		s3c_gpio_setpull(S5PV210_GPF0(i), S3C_GPIO_PULL_NONE);
-	}
-
-	for (i = 0; i < 8; i++) {
-		s3c_gpio_cfgpin(S5PV210_GPF1(i), S3C_GPIO_SFN(2));
-		s3c_gpio_setpull(S5PV210_GPF1(i), S3C_GPIO_PULL_NONE);
-	}
-
-	for (i = 0; i < 8; i++) {
-		s3c_gpio_cfgpin(S5PV210_GPF2(i), S3C_GPIO_SFN(2));
-		s3c_gpio_setpull(S5PV210_GPF2(i), S3C_GPIO_PULL_NONE);
-	}
-
-	for (i = 0; i < 4; i++) {
-		s3c_gpio_cfgpin(S5PV210_GPF3(i), S3C_GPIO_SFN(2));
-		s3c_gpio_setpull(S5PV210_GPF3(i), S3C_GPIO_PULL_NONE);
-	}
-
-	/* mDNIe SEL: why we shall write 0x2 ? */
-	writel(0x2, S5P_MDNIE_SEL);
-
-	/* drive strength to max */
-	writel(0xffffffff, S5PV210_GPF0_BASE + 0xc);
-	writel(0xffffffff, S5PV210_GPF1_BASE + 0xc);
-	writel(0xffffffff, S5PV210_GPF2_BASE + 0xc);
-	writel(0x000000ff, S5PV210_GPF3_BASE + 0xc);
+    // namko: Same as this function.
+	s3cfb_cfg_gpio(pdev);
 }
 
-#define S5PV210_GPD_0_0_TOUT_0  (0x2)
-#define S5PV210_GPD_0_1_TOUT_1  (0x2 << 4)
-#define S5PV210_GPD_0_2_TOUT_2  (0x2 << 8)
-#define S5PV210_GPD_0_3_TOUT_3  (0x2 << 12)
 static int lte480wv_backlight_on(struct platform_device *pdev)
 {
-	int err;
+    // namko: Fix backlight on function.
+    // No idea why this works, or if this works as it should,
+    // but this was picked up from s3c-keypad code. Enabling
+    // the keypad causes the screen to flicker, because apparently
+    // the backlight is being turned off and on repeatedly.
+    s3c_gpio_cfgpin(S5PV210_GPH2(4), S3C_GPIO_SFN(0));
+	s3c_gpio_setpull(S5PV210_GPH2(4), S3C_GPIO_PULL_UP);
 
-	err = gpio_request(S5PV210_GPD0(3), "GPD0");
-
-	if (err) {
-		printk(KERN_ERR "failed to request GPD0 for "
-			"lcd backlight control\n");
-		return err;
-	}
-
-	gpio_direction_output(S5PV210_GPD0(3), 1);
-
-	s3c_gpio_cfgpin(S5PV210_GPD0(3), S5PV210_GPD_0_3_TOUT_3);
-
-	gpio_free(S5PV210_GPD0(3));
 	return 0;
 }
 
 static int lte480wv_backlight_off(struct platform_device *pdev, int onoff)
 {
-	int err;
+    // namko: Fix backlight off function.
+    // See the comments for the above function.
+    s3c_gpio_cfgpin(S5PV210_GPH2(4), S3C_GPIO_SFN(0));
+    s3c_gpio_setpull(S5PV210_GPH2(4), S3C_GPIO_PULL_NONE);
 
-	err = gpio_request(S5PV210_GPD0(3), "GPD0");
-
-	if (err) {
-		printk(KERN_ERR "failed to request GPD0 for "
-				"lcd backlight control\n");
-		return err;
-	}
-
-	gpio_direction_output(S5PV210_GPD0(3), 0);
-	gpio_free(S5PV210_GPD0(3));
 	return 0;
 }
 
@@ -805,7 +760,7 @@ static struct s3c_platform_fb lte480wv_fb_data __initdata = {
 	.lcd = &lte480wv,
 	.cfg_gpio	= lte480wv_cfg_gpio,
 	.backlight_on	= lte480wv_backlight_on,
-	.backlight_onoff    = lte480wv_backlight_off,
+	.backlight_off  = lte480wv_backlight_off,
 	.reset_lcd	= lte480wv_reset_lcd,
 };
 #endif
@@ -854,6 +809,11 @@ static struct spi_board_info s3c_spi_devs[] __initdata = {
 #endif
 
 #ifdef CONFIG_HAVE_PWM
+#define S5PV210_GPD_0_0_TOUT_0  (0x2)
+#define S5PV210_GPD_0_1_TOUT_1  (0x2 << 4)
+#define S5PV210_GPD_0_2_TOUT_2  (0x2 << 8)
+#define S5PV210_GPD_0_3_TOUT_3  (0x2 << 12)
+
 struct s3c_pwm_data {
 	/* PWM output port */
 	unsigned int gpio_no;
@@ -883,18 +843,22 @@ struct s3c_pwm_data pwm_data[] = {
 #endif
 
 #if defined(CONFIG_BACKLIGHT_PWM)
+// namko: Change backlight PWM from #3 to #0.
+// But PWM #0 conflicts with s3c-keypad; hence keypad needs to be
+// kept disabled. Other than that, the default brightness is fixed
+// and so is the PWM period (from Asure's port of Mango210 kernel).
 static struct platform_pwm_backlight_data smdk_backlight_data = {
-	.pwm_id  = 3,
+	.pwm_id  = 0,
 	.max_brightness = 255,
-	.dft_brightness = 255,
-	.pwm_period_ns  = 25000,
+	.dft_brightness = 127,
+	.pwm_period_ns  = 78770,
 };
 
 static struct platform_device smdk_backlight_device = {
 	.name      = "pwm-backlight",
 	.id        = -1,
 	.dev        = {
-		.parent = &s3c_device_timer[3].dev,
+		.parent = &s3c_device_timer[0].dev,
 		.platform_data = &smdk_backlight_data,
 	},
 };
