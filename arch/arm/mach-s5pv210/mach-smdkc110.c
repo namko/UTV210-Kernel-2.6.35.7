@@ -1179,25 +1179,30 @@ static struct s3c_platform_jpeg jpeg_plat __initdata = {
 
 /* I2C0 */
 static struct i2c_board_info i2c_devs0[] __initdata = {
+	{ I2C_BOARD_INFO("gsensor", (0x30 >> 1)) },
 #ifdef CONFIG_SND_SOC_WM8580
 	{
 		I2C_BOARD_INFO("wm8580", 0x1b),
 	},
 #endif
-	{ I2C_BOARD_INFO("gsensor", (0x30 >> 1)) },
 	{ I2C_BOARD_INFO("gsensor2", (0x7a >> 1)) },
 };
 
 /* I2C1 */
 static struct i2c_board_info i2c_devs1[] __initdata = {
-#ifdef CONFIG_VIDEO_TV20
-	{
-		I2C_BOARD_INFO("s5p_ddc", (0x74>>1)),
-	},
-#endif
 #ifdef CONFIG_SND_SOC_WM8976
 	{
 		I2C_BOARD_INFO("wm8976", 0x1a),
+	},
+#endif
+#ifdef CONFIG_TOUCHSCREEN_FT5406
+	{
+		I2C_BOARD_INFO("ft5x0x_ts", (0x70>>1)),
+	},
+#endif
+#ifdef CONFIG_VIDEO_TV20
+	{
+		I2C_BOARD_INFO("s5p_ddc", (0x74>>1)),
 	},
 #endif
 };

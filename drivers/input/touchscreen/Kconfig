@@ -124,6 +124,16 @@ config TOUCHSCREEN_ADC1
               S5PC11X/S5PV210 has 2 ADC channel for touch screen. Select Y
               to use ADC channel 1
 
+config TOUCHSCREEN_FT5406
+	bool "FocalTech ft5406 touchscreen driver"
+	default y
+	help
+	  Say Y here to enable the driver for the FocalTech ft5406 touchscreen 
+	  (used in Herotab C8, Dropad A8, Haipad M7, iBall Slide and compatibles).
+
+	  This 5-point multi-touch driver is based on Violet's implementation
+	  with addition of early suspend\resume functionality.
+
 config TOUCHSCREEN_DA9034
 	tristate "Touchscreen support for Dialog Semiconductor DA9034"
 	depends on PMIC_DA903X
