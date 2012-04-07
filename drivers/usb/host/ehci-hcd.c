@@ -1190,34 +1190,16 @@ static int __init ehci_hcd_init(void)
 		 sizeof(struct ehci_itd), sizeof(struct ehci_sitd));
 
 #ifdef	CONFIG_PM
-	//added by steven cai(shijie.cai@samsung.com), for ehci suspend/resume
-	my_work_queue = create_singlethread_workqueue("my_work_queue");
-	if (!my_work_queue) {
-		printk(KERN_WARNING "can't create work-queue");
-		return -EBUSY;
-	}
+    // namko: Turn on the USB host power.
+    unsigned int nGPIO = S5PV210_GPH2(0);
+    gpio_request(nGPIO, "smdk-usb-host-0");
+    gpio_direction_output(nGPIO, 1);
+    gpio_free(nGPIO);
 
-	/* ldo6 regulator on */
-	usb_dig_regulator = regulator_get(NULL, "vdd_uhost_1.1");
-	if (IS_ERR(usb_dig_regulator)) {
-		printk(KERN_ERR "failed to get resource %s\n", "vdd_uhost_1.1");
-		return PTR_ERR(usb_dig_regulator);
-	}
-
-	/* ldo7 regulator on */
-	usb_anlg_regulator = regulator_get(NULL, "vdd_uhost_3.3");
-	if (IS_ERR(usb_anlg_regulator)) {
-		printk(KERN_ERR "failed to get resource %s\n", "vdd_uhost_3.3");
-		return PTR_ERR(usb_anlg_regulator);
-	}
-	
-	/* VDD_5V regulator on: GPG16 */
-	usb_5v_regulator = regulator_get(NULL, "vdd_5v_usb");
-	if (IS_ERR(usb_5v_regulator)) {
-		printk(KERN_ERR "failed to get resource %s\n", "vdd_5v_usb");
-		return PTR_ERR(usb_5v_regulator);
-	}
-
+    nGPIO = S5PV210_GPH2(5);
+    gpio_request(nGPIO, "smdk-usb-host-1");
+    gpio_direction_output(nGPIO, 1);
+    gpio_free(nGPIO);
 #endif
 
 #ifdef DEBUG
@@ -1312,17 +1294,16 @@ static void __exit ehci_hcd_cleanup(void)
 	clear_bit(USB_EHCI_LOADED, &usb_hcds_loaded);
 
 #ifdef	CONFIG_PM
-	//added by steven cai(shijie.cai@samsung.com), for ehci suspend/resume
-	destroy_workqueue(my_work_queue);
+    // namko: Turn off the USB host power.
+    unsigned int nGPIO = S5PV210_GPH2(0);
+    gpio_request(nGPIO, "smdk-usb-host-0");
+    gpio_direction_output(nGPIO, 0);
+    gpio_free(nGPIO);
 
-	/* VDD_5V regulator off */
-	regulator_put(usb_5v_regulator);	
-
-	/* ldo7 regulator off */
-	regulator_put(usb_anlg_regulator);	
-	
-	/* ldo6 regulator off */
-	regulator_put(usb_dig_regulator);	
+    nGPIO = S5PV210_GPH2(5);
+    gpio_request(nGPIO, "smdk-usb-host-1");
+    gpio_direction_output(nGPIO, 0);
+    gpio_free(nGPIO);
 #endif
 }
 module_exit(ehci_hcd_cleanup);

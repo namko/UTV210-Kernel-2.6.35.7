@@ -134,81 +134,10 @@ static int ehci_hcd_s5pv210_drv_resume(struct platform_device *pdev)
 #define ehci_hcd_s5pv210_drv_resume NULL
 #endif
 
-#ifdef CONFIG_PM
-//steven cai for t34
-#include <linux/regulator/consumer.h>
-static  struct regulator *usb_anlg_regulator, *usb_dig_regulator, *usb_5v_regulator;
-static  struct workqueue_struct *my_work_queue;
-static  struct work_struct work;
-static unsigned int count = 0;
-static bool no_usb_device = false;
-
-static void start_usb_host(void)
-{
-	printk("%s: %s entered\n",__FILE__, __FUNCTION__);
-	/* ldo6 regulator on */
-	regulator_enable(usb_dig_regulator);
-
-	/* ldo7 regulator on */
-	regulator_enable(usb_anlg_regulator);
-	
-	/* steven cai: if power on device from scrach, then we must start USB hub power; 
-	* if no usb device is inserted, then system suspend will power off USB hub, and here system resume need to start it.
-	*/
-	if (!count || true == no_usb_device)	{
-		/* VDD_5V regulator on */
-		regulator_enable(usb_5v_regulator);	
-		count = 1; 
-	}
-
-	/* VDD_USB5V hub power on: GPB5 */
-	s3c_gpio_setpull(S5PV210_GPB(5), S3C_GPIO_PULL_NONE);
-	s3c_gpio_cfgpin(S5PV210_GPB(5), S3C_GPIO_OUTPUT); 
-	gpio_set_value(S5PV210_GPB(5), 0); 
-}
-
-
-static void stop_usb_host(void)
-{
-static int cai_count = 0;
-	/* 
-	* steven cai: If 3G module is inserted, then we should keep power of USB hub and 3G module,
-	* otherwise ttyUSB/ttyACM node will disconnect and re-connect during ehci driver suspend/resume phase.
-	* If 3G module is not inserted, then we can lost power of USB hub and 3G module gracefully.
-	*/	
-	if (0==device_vid && 0==device_pid){  //usb device not inserted
-		printk("%s: usb device is NOT inserted\n",__FILE__);
-		no_usb_device = true;
-
-		/* VDD_USB5V hub power off: GPB5 */
-		s3c_gpio_setpull(S5PV210_GPB(5), S3C_GPIO_PULL_DOWN);
-		s3c_gpio_cfgpin(S5PV210_GPB(5), S3C_GPIO_INPUT); 
-
-		/* VDD_5V regulator off */
-		regulator_disable(usb_5v_regulator);
-	}else {
-		printk("%s: usb device(VID:0x%4x,PID:0x%4x) is inserted\n", __FILE__,device_vid, device_pid);
-		no_usb_device = false;
-	}
-	printk("%s: cai_count=%d\n", __FILE__,cai_count++);
-	/* ldo7 regulator off */
-	regulator_disable(usb_anlg_regulator);
-	
-	/* ldo6 regulator off */
-	regulator_disable(usb_dig_regulator);
-}
-#endif
-
 static void s5pv210_start_ehc(void)
 {
-#ifdef	CONFIG_PM
-	/*
-	* steven cai(shijie.cai@samsung.com)
-	* T34: start usb host related ldos, and usb external hub and usb device power 
-	*/
-	start_usb_host();
-#endif
-
+    // namko: For now, leave usb power as it is.
+    // This would be a correct place to dynamically turn it on.
 	clk_enable(usb_clk);
 	usb_host_phy_init();
 }
@@ -217,24 +146,8 @@ static void s5pv210_stop_ehc(void)
 {
 	usb_host_phy_off();
 	clk_disable(usb_clk);
-#ifdef	CONFIG_PM
-	/*
-	* steven cai(shijie.cai@samsung.com)
-	* T34: stop usb host related ldos, and usb external hub and usb device power
-	*
-	* Note: if use standard form here,
-	* stop_usb_host();
-	* then the following bug appears. 
-	* 
-	* BUG: sleeping function called from invalid context at kernel/mutex.c:94
-	* BUG: scheduling while atomic: suspend/13/0x00000002
-	*
-	* so use work queue instead.
-	*/
-	INIT_WORK(&work, stop_usb_host);
-	queue_work(my_work_queue, &work);
-#endif
-
+    // namko: For now, leave usb power as it is.
+    // This would be a correct place to dynamically turn it off.
 }
 
 static const struct hc_driver ehci_s5pv210_hc_driver = {
