@@ -703,50 +703,80 @@ static void lte480wv_cfg_gpio(struct platform_device *pdev)
 	s3cfb_cfg_gpio(pdev);
 }
 
-static int lte480wv_backlight_on(struct platform_device *pdev)
+static int lte480wv_backlight_onoff(struct platform_device *pdev, int onoff)
 {
-    // namko: Fix backlight on function.
-    // No idea why this works, or if this works as it should,
-    // but this was picked up from s3c-keypad code. Enabling
-    // the keypad causes the screen to flicker, because apparently
-    // the backlight is being turned off and on repeatedly.
-    s3c_gpio_cfgpin(S5PV210_GPH2(4), S3C_GPIO_SFN(0));
-	s3c_gpio_setpull(S5PV210_GPH2(4), S3C_GPIO_PULL_UP);
+    int err;
+
+    // mg3100: GPH2[4] LCD backlight
+    unsigned int nGPIO = S5PV210_GPH2(4);
+	err = gpio_request(nGPIO, "backlight-en");
+
+	if (err) {
+		printk(KERN_ERR "failed to request GPH2[4] for backlight control\n");
+		return err;
+	}
+
+    if (onoff)
+        gpio_direction_output(nGPIO, 1);
+    else
+        gpio_direction_output(nGPIO, 0);
+
+	mdelay(10);
+    gpio_free(nGPIO);
 
 	return 0;
 }
 
-static int lte480wv_backlight_off(struct platform_device *pdev, int onoff)
+static int lte480wv_lcd_onoff(struct platform_device *pdev, int onoff)
 {
-    // namko: Fix backlight off function.
-    // See the comments for the above function.
-    s3c_gpio_cfgpin(S5PV210_GPH2(4), S3C_GPIO_SFN(0));
-    s3c_gpio_setpull(S5PV210_GPH2(4), S3C_GPIO_PULL_NONE);
+    int err;
+
+    // mg3100: GPH1[5] LCD Power(inc backlight)
+    unsigned int nGPIO = S5PV210_GPH1(5);
+	err = gpio_request(nGPIO, "lcd-backlight-en");
+
+	if (err) {
+		printk(KERN_ERR "failed to request GPH1[5] for lcd control\n");
+		return err;
+	}
+
+    if (onoff)
+        gpio_direction_output(nGPIO, 1);
+    else
+        gpio_direction_output(nGPIO, 0);
+
+	mdelay(10);
+    gpio_free(nGPIO);
 
 	return 0;
+}
+
+static int lte480wv_backlight_on(struct platform_device *pdev)
+{
+    return lte480wv_backlight_onoff(pdev, 1);
+}
+
+static int lte480wv_backlight_off(struct platform_device *pdev)
+{
+    return lte480wv_backlight_onoff(pdev, 0);
+}
+
+static int lte480wv_lcd_on(struct platform_device *pdev)
+{
+	return lte480wv_lcd_onoff(pdev, 1);
+}
+
+static int lte480wv_lcd_off(struct platform_device *pdev)
+{
+	return lte480wv_lcd_onoff(pdev, 0);
 }
 
 static int lte480wv_reset_lcd(struct platform_device *pdev)
 {
-	int err;
-
-	err = gpio_request(S5PV210_GPH0(6), "GPH0");
-	if (err) {
-		printk(KERN_ERR "failed to request GPH0 for "
-				"lcd reset control\n");
-		return err;
-	}
-
-	gpio_direction_output(S5PV210_GPH0(6), 1);
-	mdelay(100);
-
-	gpio_set_value(S5PV210_GPH0(6), 0);
-	mdelay(10);
-
-	gpio_set_value(S5PV210_GPH0(6), 1);
-	mdelay(10);
-
-	gpio_free(S5PV210_GPH0(6));
+    lte480wv_lcd_on(pdev);
+	mdelay(90);
+    lte480wv_lcd_off(pdev);
+    lte480wv_lcd_on(pdev);
 
 	return 0;
 }
@@ -757,11 +787,13 @@ static struct s3c_platform_fb lte480wv_fb_data __initdata = {
 	.default_win = CONFIG_FB_S3C_DEFAULT_WINDOW,
 	.swap = FB_SWAP_WORD | FB_SWAP_HWORD,
 
-	.lcd = &lte480wv,
-	.cfg_gpio	= lte480wv_cfg_gpio,
-	.backlight_on	= lte480wv_backlight_on,
-	.backlight_off  = lte480wv_backlight_off,
-	.reset_lcd	= lte480wv_reset_lcd,
+	.lcd                = &lte480wv,
+	.cfg_gpio	        = lte480wv_cfg_gpio,
+	.backlight_on	    = lte480wv_backlight_on,
+	.backlight_off      = lte480wv_backlight_off,
+    .lcd_on             = lte480wv_lcd_on,
+    .lcd_off            = lte480wv_lcd_off,
+	.reset_lcd	        = lte480wv_reset_lcd,
 };
 #endif
 
