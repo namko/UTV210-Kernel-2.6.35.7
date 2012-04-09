@@ -1205,6 +1205,11 @@ static struct i2c_board_info i2c_devs1[] __initdata = {
 		I2C_BOARD_INFO("s5p_ddc", (0x74>>1)),
 	},
 #endif
+#ifdef CONFIG_ACCEL_MMA7660
+	{
+		I2C_BOARD_INFO("mma7660", (0x98>>1)),
+	},
+#endif
 };
 
 /* I2C2 */

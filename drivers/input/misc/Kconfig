@@ -18,6 +18,14 @@ config GYRO_K3G
 	help
 	  This option enables gyro sensors using K3G driver
 
+config ACCEL_MMA7660
+	depends on I2C
+	bool "MMA7660 driver for s5pv210"
+	default y
+	help
+	  This option enables accelerometer sensors using MMA7660 driver
+	  (used in Herotab C8, Dropad A8, Haipad M7, iBall Slide and compatibles).
+
 config INPUT_88PM860X_ONKEY
 	tristate "88PM860x ONKEY support"
 	depends on MFD_88PM860X
