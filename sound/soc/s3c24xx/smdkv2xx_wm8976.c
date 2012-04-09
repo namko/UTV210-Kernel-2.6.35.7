@@ -12,6 +12,8 @@
 
 #include <linux/platform_device.h>
 #include <linux/clk.h>
+#include <linux/workqueue.h>
+#include <linux/gpio.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -616,9 +618,29 @@ static void ut_check_i2s_board_type(void)
 	}*/
 }
 
+static struct delayed_work audio_jack_watcher_work;
+
+static void audio_jack_watcher(struct work_struct *work)
+{
+    // mg3100: Reading through my old notes I found this : pin101 = GPH3[2]
+    // Mute sound to XPT4890 Active low. So all you have to do is pullup GPH3[2]
+    // and you have sound through the speaker!!
+    unsigned int nGPIO = S5PV210_GPH3(2);
+    gpio_request(nGPIO, "speaker-enable");
+
+    // mg3100: The 3.5mm jack detection is connected to GPH0[0] or XEINT[0]
+    // it is pulled low when connected.
+    gpio_direction_output(nGPIO, gpio_get_value(S5PV210_GPH0(0)));
+    gpio_free(nGPIO);
+
+    schedule_delayed_work(&audio_jack_watcher_work, HZ / 4);
+}
+
 static int __init smdkv2xx_audio_init(void)
 {
 	int ret;
+    unsigned int nGPIO;
+
 	WM8976_DEBUG(" smdkv210_audio_init start\n");
 //	 extern char g_selected_codec[];
 	#if 0 //wang
@@ -647,7 +669,18 @@ static int __init smdkv2xx_audio_init(void)
 
 	//add by urbetter
 	speaker_scan_init();
-	
+
+    // namko: Mark GPH0[0] as an input GPIO.
+    nGPIO = S5PV210_GPH0(0);
+    gpio_request(nGPIO, "3.5-jack-detection");
+    gpio_direction_input(nGPIO);
+    gpio_free(nGPIO);
+
+	// namko: This is to watch the 3.5mm jack and disable\enable
+    // the external speaker accordingly.
+    INIT_DELAYED_WORK(&audio_jack_watcher_work, audio_jack_watcher);
+    schedule_delayed_work(&audio_jack_watcher_work, 0);	
+
 	printk("smdkv2xx_audio_init done\n");
 	return ret;
 }
