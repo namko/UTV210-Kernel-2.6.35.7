@@ -42,3 +42,4 @@ obj-$(CONFIG_KEYPAD_CYPRESS_TOUCH)      += cypress-touchkey.o
 obj-$(CONFIG_KEYPAD_MELFAS_TOUCH)                += melfas-touchkey.o
 obj-$(CONFIG_KEYPAD_MELFAS_TOUCH)                += melfas_download.o
 obj-$(CONFIG_KEYPAD_S3C)		+= s3c-keypad.o
+obj-$(CONFIG_KEYPAD_S3C_BUTTON)	+= s3c-button.o

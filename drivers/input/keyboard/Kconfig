@@ -478,4 +478,13 @@ config KEYPAD_CYPRESS_TOUCH
 	  To compile this driver as a module, choose M here: the
 	  module will be called cypress-touchkey.
 
+config KEYPAD_S3C_BUTTON
+	bool "UTV210 button support"
+	depends on CPU_S5PC110 || CPU_S5PV210
+	default y
+	help
+	  Say Y here if you want to use the buttons found on the
+	  Herotab C8/Dropad A8/Haipad M7/iBall Slide and compatible
+	  tablets.
+
 endif
