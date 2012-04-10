@@ -29,6 +29,24 @@
 #include <mach/gpio.h>
 #include <plat/gpio-cfg.h>
 
+
+#ifdef CONFIG_TOUCHSCREEN_FT5406_ICS
+
+#define TS_POSITION_X           ABS_MT_POSITION_X
+#define TS_POSITION_Y           ABS_MT_POSITION_Y
+#define TS_PRESSURE             ABS_MT_PRESSURE
+#define TS_TOUCH_SIZE           ABS_MT_TOUCH_MAJOR
+#define TS_TOUCH_BTN            BTN_TOUCH
+
+#else
+
+#define TS_POSITION_X           ABS_MT_POSITION_X
+#define TS_POSITION_Y           ABS_MT_POSITION_Y
+#define TS_PRESSURE             ABS_MT_TOUCH_MAJOR
+#define TS_TOUCH_SIZE           ABS_MT_WIDTH_MAJOR
+
+#endif
+
 /***********************************************************************************************
 some forward declarations: driver callbacks
 ***********************************************************************************************/
@@ -214,7 +232,14 @@ function:
 static void ft5406_ts_release(void)
 {
     struct ft5406_ts_data *data = i2c_get_clientdata(this_client);
-    input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, 0);
+
+#ifdef CONFIG_TOUCHSCREEN_FT5406_ICS
+    input_mt_sync(data->input_dev);
+    input_report_key(data->input_dev, TS_TOUCH_BTN, 0);
+#else
+    input_report_abs(data->input_dev, TS_PRESSURE, 0);
+#endif
+
     input_sync(data->input_dev);
 }
 
@@ -359,40 +384,44 @@ static void ft5406_report_value(void)
     switch(event->touch_point) 
     {
         case 5:
-            input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, event->pressure);
-            input_report_abs(data->input_dev, ABS_MT_POSITION_X, event->x5);
-            input_report_abs(data->input_dev, ABS_MT_POSITION_Y, event->y5);
-            input_report_abs(data->input_dev, ABS_MT_WIDTH_MAJOR, 1);
+            input_report_abs(data->input_dev, TS_PRESSURE, event->pressure);
+            input_report_abs(data->input_dev, TS_POSITION_X, event->x5);
+            input_report_abs(data->input_dev, TS_POSITION_Y, event->y5);
+            input_report_abs(data->input_dev, TS_TOUCH_SIZE, 1);
             input_mt_sync(data->input_dev);
             dev_dbg(&this_client->dev, "===x2 = %d,y2 = %d ====\n",event->x2,event->y2);
         case 4:
-            input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, event->pressure);
-            input_report_abs(data->input_dev, ABS_MT_POSITION_X, event->x4);
-            input_report_abs(data->input_dev, ABS_MT_POSITION_Y, event->y4);
-            input_report_abs(data->input_dev, ABS_MT_WIDTH_MAJOR, 1);
+            input_report_abs(data->input_dev, TS_PRESSURE, event->pressure);
+            input_report_abs(data->input_dev, TS_POSITION_X, event->x4);
+            input_report_abs(data->input_dev, TS_POSITION_Y, event->y4);
+            input_report_abs(data->input_dev, TS_TOUCH_SIZE, 1);
             input_mt_sync(data->input_dev);
             dev_dbg(&this_client->dev, "===x2 = %d,y2 = %d ====\n",event->x2,event->y2);
         case 3:
-            input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, event->pressure);
-            input_report_abs(data->input_dev, ABS_MT_POSITION_X, event->x3);
-            input_report_abs(data->input_dev, ABS_MT_POSITION_Y, event->y3);
-            input_report_abs(data->input_dev, ABS_MT_WIDTH_MAJOR, 1);
+            input_report_abs(data->input_dev, TS_PRESSURE, event->pressure);
+            input_report_abs(data->input_dev, TS_POSITION_X, event->x3);
+            input_report_abs(data->input_dev, TS_POSITION_Y, event->y3);
+            input_report_abs(data->input_dev, TS_TOUCH_SIZE, 1);
             input_mt_sync(data->input_dev);
             dev_dbg(&this_client->dev, "===x2 = %d,y2 = %d ====\n",event->x2,event->y2);
         case 2:
-            input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, event->pressure);
-            input_report_abs(data->input_dev, ABS_MT_POSITION_X, event->x2);
-            input_report_abs(data->input_dev, ABS_MT_POSITION_Y, event->y2);
-            input_report_abs(data->input_dev, ABS_MT_WIDTH_MAJOR, 1);
+            input_report_abs(data->input_dev, TS_PRESSURE, event->pressure);
+            input_report_abs(data->input_dev, TS_POSITION_X, event->x2);
+            input_report_abs(data->input_dev, TS_POSITION_Y, event->y2);
+            input_report_abs(data->input_dev, TS_TOUCH_SIZE, 1);
             input_mt_sync(data->input_dev);
             dev_dbg(&this_client->dev, "===x2 = %d,y2 = %d ====\n",event->x2,event->y2);
         case 1:
-            input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR, event->pressure);
-            input_report_abs(data->input_dev, ABS_MT_POSITION_X, event->x1);
-            input_report_abs(data->input_dev, ABS_MT_POSITION_Y, event->y1);
-            input_report_abs(data->input_dev, ABS_MT_WIDTH_MAJOR, 1);
+            input_report_abs(data->input_dev, TS_PRESSURE, event->pressure);
+            input_report_abs(data->input_dev, TS_POSITION_X, event->x1);
+            input_report_abs(data->input_dev, TS_POSITION_Y, event->y1);
+            input_report_abs(data->input_dev, TS_TOUCH_SIZE, 1);
             input_mt_sync(data->input_dev);
             dev_dbg(&this_client->dev, "===x1 = %d,y1 = %d ====\n",event->x1,event->y1);
+
+#ifdef CONFIG_TOUCHSCREEN_FT5406_ICS
+            input_report_key(data->input_dev, TS_TOUCH_BTN, 1);
+#endif
 
         default:
             break;
@@ -571,16 +600,19 @@ static int ft5406_ts_probe(struct i2c_client *client, const struct i2c_device_id
     ft5406_ts->input_dev = input_dev;
     input_dev->name = FT5406_NAME;
 
+#ifdef CONFIG_TOUCHSCREEN_FT5406_ICS
+    set_bit(TS_TOUCH_BTN, input_dev->keybit);
+#endif
 
-    set_bit(ABS_MT_TOUCH_MAJOR, input_dev->absbit);
-    set_bit(ABS_MT_POSITION_X, input_dev->absbit);
-    set_bit(ABS_MT_POSITION_Y, input_dev->absbit);
-    set_bit(ABS_MT_WIDTH_MAJOR, input_dev->absbit);
+    set_bit(TS_PRESSURE, input_dev->absbit);
+    set_bit(TS_POSITION_X, input_dev->absbit);
+    set_bit(TS_POSITION_Y, input_dev->absbit);
+    set_bit(TS_TOUCH_SIZE, input_dev->absbit);
 
-    input_set_abs_params(input_dev, ABS_MT_POSITION_X, 0, SCREEN_MAX_X, 0, 0);
-    input_set_abs_params(input_dev, ABS_MT_POSITION_Y, 0, SCREEN_MAX_Y, 0, 0);
-    input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR, 0, PRESS_MAX, 0, 0);
-    input_set_abs_params(input_dev, ABS_MT_WIDTH_MAJOR, 0, 200, 0, 0);
+    input_set_abs_params(input_dev, TS_POSITION_X, 0, SCREEN_MAX_X, 0, 0);
+    input_set_abs_params(input_dev, TS_POSITION_Y, 0, SCREEN_MAX_Y, 0, 0);
+    input_set_abs_params(input_dev, TS_PRESSURE, 0, PRESS_MAX, 0, 0);
+    input_set_abs_params(input_dev, TS_TOUCH_SIZE, 0, 200, 0, 0);
 
     set_bit(EV_ABS, input_dev->evbit);
     set_bit(EV_KEY, input_dev->evbit);

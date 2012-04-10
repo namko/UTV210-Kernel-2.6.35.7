@@ -134,6 +134,14 @@ config TOUCHSCREEN_FT5406
 	  This 5-point multi-touch driver is based on Violet's implementation
 	  with addition of early suspend\resume functionality.
 
+config TOUCHSCREEN_FT5406_ICS
+          bool "Android 4.0 compatibility"
+          depends on TOUCHSCREEN_FT5406
+          default y
+          help
+              Select Y to enable compatibility with Android 4.0. ICS introduces
+              changes that break GB and older drivers.
+
 config TOUCHSCREEN_DA9034
 	tristate "Touchscreen support for Dialog Semiconductor DA9034"
 	depends on PMIC_DA903X
