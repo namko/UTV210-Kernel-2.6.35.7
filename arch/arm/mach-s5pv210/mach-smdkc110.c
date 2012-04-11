@@ -1262,9 +1262,16 @@ static struct i2c_board_info i2c_devs2[] __initdata = {
 #define S5PV210_PS_HOLD_CONTROL_REG (S3C_VA_SYS+0xE81C)
 static void smdkc110_power_off(void)
 {
+    int nGPIO = S5PV210_GPH0(5);
+
 	/* PS_HOLD output High --> Low */
 	writel(readl(S5PV210_PS_HOLD_CONTROL_REG) & 0xFFFFFEFF,
 			S5PV210_PS_HOLD_CONTROL_REG);
+
+    // namko: Fix shutdown issue. GPH0[5] is the main power.
+    gpio_request(nGPIO, "main-power-en");
+    gpio_direction_output(nGPIO, 0);
+    gpio_free(nGPIO);
 
 	while (1);
 }
