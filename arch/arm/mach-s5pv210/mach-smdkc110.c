@@ -731,22 +731,31 @@ static int lte480wv_lcd_onoff(struct platform_device *pdev, int onoff)
 {
     int err;
 
-    // mg3100: GPH1[5] LCD Power(inc backlight)
-    unsigned int nGPIO = S5PV210_GPH1(5);
-	err = gpio_request(nGPIO, "lcd-backlight-en");
+    // namko: Use GPH1[6] and GPH1[7] to control LCD power (including backlight)
+    unsigned int nGPIOs[] = {S5PV210_GPH1(6), S5PV210_GPH1(7)};
 
-	if (err) {
-		printk(KERN_ERR "failed to request GPH1[5] for lcd control\n");
+	if ((err = gpio_request(nGPIOs[0], "lcd-backlight-en"))) {
+		printk(KERN_ERR "failed to request GPH1[6] for lcd control\n");
 		return err;
 	}
 
-    if (onoff)
-        gpio_direction_output(nGPIO, 1);
-    else
-        gpio_direction_output(nGPIO, 0);
+	if ((err = gpio_request(nGPIOs[1], "lcd-backlight-en"))) {
+		printk(KERN_ERR "failed to request GPH1[7] for lcd control\n");
+        gpio_free(nGPIOs[0]);
+		return err;
+	}
 
-	mdelay(10);
-    gpio_free(nGPIO);
+    if (onoff) {
+        gpio_direction_output(nGPIOs[0], 1);
+        gpio_direction_output(nGPIOs[1], 0);
+    } else {
+        gpio_direction_output(nGPIOs[0], 0);
+        gpio_direction_output(nGPIOs[1], 1);
+    }
+
+	mdelay(20);
+    gpio_free(nGPIOs[1]);
+    gpio_free(nGPIOs[0]);
 
 	return 0;
 }
@@ -774,10 +783,9 @@ static int lte480wv_lcd_off(struct platform_device *pdev)
 static int lte480wv_reset_lcd(struct platform_device *pdev)
 {
     lte480wv_lcd_on(pdev);
-	mdelay(90);
+	mdelay(200);
     lte480wv_lcd_off(pdev);
     lte480wv_lcd_on(pdev);
-
 	return 0;
 }
 
