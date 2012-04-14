@@ -1659,6 +1659,13 @@ static void __init smdkc110_machine_init(void)
 
 #ifdef CONFIG_BACKLIGHT_PWM
 	smdk_backlight_register();
+
+#ifdef CONFIG_FB_S3C_LTE480WV
+    // Turn off the LCD and backlight. This prevents the unnecessary
+    // flickering and the display changing.
+    lte480wv_backlight_onoff(NULL, 0);
+    lte480wv_lcd_onoff(NULL, 0);
+#endif
 #endif
 
 	regulator_has_full_constraints();

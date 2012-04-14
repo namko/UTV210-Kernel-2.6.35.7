@@ -1001,14 +1001,14 @@ static int __devinit s3cfb_probe(struct platform_device *pdev)
 	}
 
 #ifdef CONFIG_FB_S3C_LCD_INIT
-	if (pdata->backlight_on)
-		pdata->backlight_on(pdev);
-
 	if (!bootloaderfb && pdata->reset_lcd)
 		pdata->reset_lcd(pdev);
 
 	if (pdata->lcd_on)
 		pdata->lcd_on(pdev);
+
+	if (pdata->backlight_on)
+		pdata->backlight_on(pdev);
 #endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
