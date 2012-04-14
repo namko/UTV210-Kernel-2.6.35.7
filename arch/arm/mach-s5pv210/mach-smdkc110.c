@@ -1276,9 +1276,15 @@ static void smdkc110_power_off(void)
 	while (1);
 }
 
-#ifdef CONFIG_BATTERY_S3C
+#if defined(CONFIG_BATTERY_S3C) || defined(CONFIG_BATTERY_UTV210)
 struct platform_device sec_device_battery = {
+#if defined(CONFIG_BATTERY_S3C)
 	.name   = "sec-fake-battery",
+#elif defined(CONFIG_BATTERY_UTV210)
+	.name   = "utv210-battery",
+#else
+#error "ERROR incorrect battery configuration"
+#endif
 	.id = -1,
 };
 #endif
@@ -1401,7 +1407,7 @@ static struct platform_device *smdkc110_devices[] __initdata = {
 	&s3c_device_rndis,
 #endif
 #endif
-#ifdef CONFIG_BATTERY_S3C
+#if defined(CONFIG_BATTERY_S3C) || defined(CONFIG_BATTERY_UTV210)
 	&sec_device_battery,
 #endif
 #ifdef CONFIG_S3C_DEV_HSMMC

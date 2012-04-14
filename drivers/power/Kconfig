@@ -148,6 +148,13 @@ config BATTERY_S5PC110
 	help
 	  Say Y to enable support for batteries with s5pc110 chip.	  
 
+config BATTERY_UTV210
+	bool "Battery driver for UTV210-based tablets"
+	depends on ARCH_S5PV210
+	help
+	  Say Y to enable support for batteries with
+	  Herotab C8/Dropad A8/Haipad M7/iBall Slide and compatibles.
+
 config CHARGER_PCF50633
 	tristate "NXP PCF50633 MBC"
 	depends on MFD_PCF50633

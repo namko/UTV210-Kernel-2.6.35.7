@@ -38,3 +38,4 @@ obj-$(CONFIG_CHARGER_PCF50633)	+= pcf50633-charger.o
 
 obj-$(CONFIG_BATTERY_S5PC110)	+= s5pc110_battery.o
 obj-$(CONFIG_BATTERY_S3C)	+= s3c_fake_battery.o
+obj-$(CONFIG_BATTERY_UTV210)	+= utv210_battery.o
