@@ -29,15 +29,8 @@
 
 #define DRIVER_NAME             "utv210-battery"
 #define DRIVER_ADC_CHANNEL      0
-
-// namko: The GPIO to use to check if AC is connected is GPH3[6].
-static const unsigned int nGPIO_AC_Connected = S5PV210_GPH3(6);
-
-// namko: To prevent rapidly-varying/spurious battery percentages the
-// ADC's value should be integrated over an interval of time. Currently
-// this is set to a minute and appears to provide reasonable data.
 #define POLL_INTERVAL_IN_SECS   3
-#define NUMBER_OF_VALUES_AVG    20
+#define NUMBER_OF_SAMPLES       10
 
 // namko: Experiments reveal that maximum value of ADCIN0 is about 3300
 // for full battery and reduces by approximately 6 for every percent.
@@ -49,31 +42,33 @@ static const int ADC_MAX_MV = 3300, ADC_MIN_MV = 2600;
 static const int BATTERY_MAX_MV = 8500, BATTERY_MIN_MV = 7200;
 
 static struct wake_lock vbus_wake_lock;
-static int s3c_battery_initial;
+static struct device *dev;
+static int utv210_battery_initial;
 
 /* Prototypes */
 extern int s3c_adc_get_adc_data(int channel);
 
 static ssize_t utv210_bat_show_property(struct device *dev,
-                                        struct device_attribute *attr,
-                                        char *buf);
+                                       struct device_attribute *attr,
+                                       char *buf);
 
 static ssize_t utv210_bat_store(struct device *dev, 
                                 struct device_attribute *attr,
                                 const char *buf, size_t count);
 
-static struct device *dev;
-
 static char *status_text[] = {
     [POWER_SUPPLY_STATUS_UNKNOWN] =         "Unknown",
     [POWER_SUPPLY_STATUS_CHARGING] =        "Charging",
     [POWER_SUPPLY_STATUS_DISCHARGING] =     "Discharging",
+    [POWER_SUPPLY_STATUS_NOT_CHARGING] =    "Not Charging",
     [POWER_SUPPLY_STATUS_FULL] =            "Full",
 };
 
 typedef enum {
     CHARGER_BATTERY = 0,
-    CHARGER_AC
+    CHARGER_USB,
+    CHARGER_AC,
+    CHARGER_DISCHARGE
 } charger_type_t;
 
 struct battery_info {
@@ -86,7 +81,7 @@ struct battery_info {
     u32 batt_temp_adc_cal;      /* Battery Temperature ADC value (calibrated) */
     u32 batt_current;           /* Battery current from ADC */
     u32 level;                  /* formula */
-    u32 charging_source;        /* 0: no cable, 1:AC */
+    u32 charging_source;        /* 0: no cable, 1:usb, 2:AC */
     u32 charging_enabled;       /* 0: Disable, 1: Enable */
     u32 batt_health;            /* Battery Health (Authority) */
     u32 batt_is_full;           /* 0 : Not full 1: Full */
@@ -130,8 +125,7 @@ static int utv210_get_bat_vol(struct power_supply *bat_ps) {
             (ADC_MAX_MV - ADC_MIN_MV) / (utv210_bat_info.batt_vol_adc - ADC_MIN_MV);
 }
 
-static int utv210_bat_get_charging_status(void)
-{
+static int utv210_bat_get_charging_status(void) {
     charger_type_t charger = CHARGER_BATTERY; 
     int ret = 0;
         
@@ -139,14 +133,19 @@ static int utv210_bat_get_charging_status(void)
         
     switch (charger) {
     case CHARGER_BATTERY:
-        ret = POWER_SUPPLY_STATUS_DISCHARGING;
+        ret = POWER_SUPPLY_STATUS_NOT_CHARGING;
         break;
+    case CHARGER_USB:
     case CHARGER_AC:
-        if (utv210_bat_info.level == 100 && 
-            utv210_bat_info.batt_is_full)
+        if (utv210_bat_info.level == 100 
+            && utv210_bat_info.batt_is_full) {
             ret = POWER_SUPPLY_STATUS_FULL;
-        else
+        } else {
             ret = POWER_SUPPLY_STATUS_CHARGING;
+        }
+        break;
+    case CHARGER_DISCHARGE:
+        ret = POWER_SUPPLY_STATUS_DISCHARGING;
         break;
     default:
         ret = POWER_SUPPLY_STATUS_UNKNOWN;
@@ -157,9 +156,8 @@ static int utv210_bat_get_charging_status(void)
 }
 
 static int utv210_bat_get_property(struct power_supply *bat_ps, 
-        enum power_supply_property psp,
-        union power_supply_propval *val)
-{
+                                   enum power_supply_property psp,
+                                   union power_supply_propval *val) {
     dev_dbg(bat_ps->dev, "%s : psp = %d\n", __func__, psp);
 
     switch (psp) {
@@ -192,8 +190,8 @@ static int utv210_bat_get_property(struct power_supply *bat_ps,
 }
 
 static int utv210_power_get_property(struct power_supply *bat_ps, 
-            enum power_supply_property psp, 
-            union power_supply_propval *val) {
+                                     enum power_supply_property psp, 
+                                     union power_supply_propval *val) {
     charger_type_t charger;
     
     dev_dbg(bat_ps->dev, "%s : psp = %d\n", __func__, psp);
@@ -204,6 +202,8 @@ static int utv210_power_get_property(struct power_supply *bat_ps,
     case POWER_SUPPLY_PROP_ONLINE:
         if (bat_ps->type == POWER_SUPPLY_TYPE_MAINS)
             val->intval = (charger == CHARGER_AC ? 1 : 0);
+        else if (bat_ps->type == POWER_SUPPLY_TYPE_USB)
+            val->intval = (charger == CHARGER_USB ? 1 : 0);
         else
             val->intval = 0;
         break;
@@ -251,15 +251,14 @@ static int utv210_bat_create_attrs(struct device * dev) {
 
 attrs_failed:
     while (i--)
-        device_remove_file(dev, &utv210_battery_attrs[i]);
-
+    device_remove_file(dev, &utv210_battery_attrs[i]);
 succeed:
     return rc;
 }
 
 static ssize_t utv210_bat_show_property(struct device *dev,
-                                        struct device_attribute *attr,
-                                        char *buf) {
+                                      struct device_attribute *attr,
+                                      char *buf) {
     int i = 0;
     const ptrdiff_t off = attr - utv210_battery_attrs;
 
@@ -296,8 +295,8 @@ static ssize_t utv210_bat_show_property(struct device *dev,
 }
 
 static ssize_t utv210_bat_store(struct device *dev, 
-                                struct device_attribute *attr,
-                                const char *buf, size_t count) {
+                 struct device_attribute *attr,
+                 const char *buf, size_t count) {
     int x = 0;
     int ret = 0;
     const ptrdiff_t off = attr - utv210_battery_attrs;
@@ -349,6 +348,15 @@ static struct power_supply utv210_power_supplies[] = {
         .get_property = utv210_bat_get_property,
     },
     {
+        .name = "usb",
+        .type = POWER_SUPPLY_TYPE_USB,
+        .supplied_to = supply_list,
+        .num_supplicants = ARRAY_SIZE(supply_list),
+        .properties = utv210_power_properties,
+        .num_properties = ARRAY_SIZE(utv210_power_properties),
+        .get_property = utv210_power_get_property,
+    },
+    {
         .name = "ac",
         .type = POWER_SUPPLY_TYPE_MAINS,
         .supplied_to = supply_list,
@@ -361,32 +369,37 @@ static struct power_supply utv210_power_supplies[] = {
 
 static int s3c_cable_status_update(int status) {
     int ret = 0;
-    bool source_changed = false;
     charger_type_t source = CHARGER_BATTERY;
 
-    dev_dbg(dev, "*** %s ***\n", __func__);
+    dev_dbg(dev, "%s\n", __func__);
 
-	if(!s3c_battery_initial)
-		return -EPERM;
+    if(!utv210_battery_initial)
+        return -EPERM;
 
     switch(status) {
     case CHARGER_BATTERY:
         dev_dbg(dev, "%s : cable NOT PRESENT\n", __func__);
         utv210_bat_info.charging_source = CHARGER_BATTERY;
         break;
+    case CHARGER_USB:
+        dev_dbg(dev, "%s : cable USB\n", __func__);
+        utv210_bat_info.charging_source = CHARGER_USB;
+        break;
     case CHARGER_AC:
         dev_dbg(dev, "%s : cable AC\n", __func__);
         utv210_bat_info.charging_source = CHARGER_AC;
+        break;
+    case CHARGER_DISCHARGE:
+        dev_dbg(dev, "%s : Discharge\n", __func__);
+        utv210_bat_info.charging_source = CHARGER_DISCHARGE;
         break;
     default:
         dev_err(dev, "%s : Nat supported status\n", __func__);
         ret = -EINVAL;
     }
-
-    source_changed = (source != utv210_bat_info.charging_source);
     source = utv210_bat_info.charging_source;
 
-    if (source == CHARGER_AC) {
+    if (source == CHARGER_USB || source == CHARGER_AC) {
         wake_lock(&vbus_wake_lock);
     } else {
         /* give userspace some time to see the uevent and update
@@ -397,23 +410,26 @@ static int s3c_cable_status_update(int status) {
 
     /* if the power source changes, all power supplies may change state */
     power_supply_changed(&utv210_power_supplies[CHARGER_BATTERY]);
-
-    if (source_changed);
-        power_supply_changed(&utv210_power_supplies[CHARGER_AC]);
-
+    /*
+    power_supply_changed(&utv210_power_supplies[CHARGER_USB]);
+    power_supply_changed(&utv210_power_supplies[CHARGER_AC]);
+    */
     dev_dbg(dev, "%s : call power_supply_changed\n", __func__);
     return ret;
 }
 
 static void utv210_bat_status_update(struct power_supply *bat_ps) {
-    int old_level, old_temp, old_vol;
+    int old_level, old_temp, old_is_full;
     dev_dbg(dev, "++ %s ++\n", __func__);
+
+    if(!utv210_battery_initial)
+        return;
 
     mutex_lock(&work_lock);
 
     old_temp = utv210_bat_info.batt_temp;
     old_level = utv210_bat_info.level; 
-    old_vol = utv210_bat_info.batt_vol;
+    old_is_full = utv210_bat_info.batt_is_full;
 
     utv210_bat_info.batt_temp = utv210_get_bat_temp(bat_ps);
     utv210_bat_info.level = utv210_get_bat_level(bat_ps);
@@ -421,7 +437,7 @@ static void utv210_bat_status_update(struct power_supply *bat_ps) {
 
     if (old_level != utv210_bat_info.level ||
             old_temp != utv210_bat_info.batt_temp ||
-            old_vol != utv210_bat_info.batt_vol) {
+            old_is_full != utv210_bat_info.batt_is_full) {
         power_supply_changed(bat_ps);
         dev_dbg(dev, "%s : call power_supply_changed\n", __func__);
     }
@@ -435,7 +451,8 @@ void s3c_cable_check_status(int flag) {
 
     if (flag == 0)  // Battery
         status = CHARGER_BATTERY;
-
+    else            // USB
+        status = CHARGER_USB;
     s3c_cable_status_update(status);
 }
 EXPORT_SYMBOL(s3c_cable_check_status);
@@ -455,35 +472,33 @@ static int utv210_bat_resume(struct platform_device *pdev) {
 #define utv210_bat_resume NULL
 #endif /* CONFIG_PM */
 
-static int last_voltage_ptr;
-static unsigned int last_voltages[NUMBER_OF_VALUES_AVG];
 static struct delayed_work battery_watcher_work;
 
 static void battery_watcher(struct work_struct *work) {
     int i;
-    bool charger;
-    unsigned int sum;
+    unsigned int sum, min, max;
+    static unsigned int readings[NUMBER_OF_SAMPLES];
 
     dev_dbg(dev, "*** %s: ***\n", __func__);
 
-    // Check if the charger is connected.
-    charger = gpio_get_value(nGPIO_AC_Connected) ? true : false;
-
-    if (charger && utv210_bat_info.charging_source != CHARGER_AC)
-        s3c_cable_status_update(CHARGER_AC);
-    else if (!charger && utv210_bat_info.charging_source != CHARGER_BATTERY)
-        s3c_cable_status_update(CHARGER_BATTERY);
-
     // Read ADC.
-    last_voltages[last_voltage_ptr++] = s3c_adc_get_adc_data(DRIVER_ADC_CHANNEL);
-    last_voltage_ptr %= NUMBER_OF_VALUES_AVG;
+    for (i = 0, sum = 0; i < NUMBER_OF_SAMPLES; i++) {
+        readings[i] = s3c_adc_get_adc_data(DRIVER_ADC_CHANNEL);
+        sum += readings[i];
 
-    for (i = 0, sum = 0; i < NUMBER_OF_VALUES_AVG; i++)
-        sum += last_voltages[i];
-
-    utv210_bat_info.batt_vol_adc = sum / NUMBER_OF_VALUES_AVG;
+        if (i) {
+            if (readings[i] < min)
+                min = readings[i];
+            if (readings[i] > max)
+                max = readings[i];
+        } else {
+            min = readings[i];
+            max = readings[i];
+        }
+    }
     
     // Update battery.
+    utv210_bat_info.batt_vol_adc = (sum - min - max) / (NUMBER_OF_SAMPLES - 2);
     utv210_bat_status_update(&utv210_power_supplies[CHARGER_BATTERY]);
     schedule_delayed_work(&battery_watcher_work, HZ * POLL_INTERVAL_IN_SECS);
 }
@@ -509,28 +524,20 @@ static int __devinit utv210_bat_probe(struct platform_device *pdev) {
     utv210_bat_info.batt_health = POWER_SUPPLY_HEALTH_GOOD;
 
     /* init power supplier framework */
-    for (i = 0; i < ARRAY_SIZE(utv210_power_supplies); i++) {
-        ret = power_supply_register(&pdev->dev, 
-                &utv210_power_supplies[i]);
-        if (ret) {
+    for (i = 0; i < ARRAY_SIZE(utv210_power_supplies); i++)
+        if ((ret = power_supply_register(&pdev->dev, &utv210_power_supplies[i]))) {
             dev_err(dev, "Failed to register power supply %d,%d\n", i, ret);
             goto __end__;
         }
-    }
-
-    // namko: Read ADC values.
-    last_voltage_ptr = 0;
-    for (i = 0; i < NUMBER_OF_VALUES_AVG; i++)
-        last_voltages[i] = s3c_adc_get_adc_data(DRIVER_ADC_CHANNEL);
 
     /* create detail attributes */
     utv210_bat_create_attrs(utv210_power_supplies[CHARGER_BATTERY].dev);
-	s3c_battery_initial = 1;
+    utv210_battery_initial = 1;
     utv210_bat_status_update(&utv210_power_supplies[CHARGER_BATTERY]);
 
     // namko: Schedule battery updates.
     INIT_DELAYED_WORK(&battery_watcher_work, battery_watcher);
-    schedule_delayed_work(&battery_watcher_work, 0);	
+    schedule_delayed_work(&battery_watcher_work, 0);
 
 __end__:
     return ret;
@@ -559,8 +566,6 @@ static struct platform_driver utv210_bat_driver = {
 
 static int __init utv210_bat_init(void) {
     printk("*** %s ***\n", __func__);
-    gpio_request(nGPIO_AC_Connected, "ac-connected");
-    gpio_direction_input(nGPIO_AC_Connected);
     wake_lock_init(&vbus_wake_lock, WAKE_LOCK_SUSPEND, "vbus_present");
     return platform_driver_register(&utv210_bat_driver);
 }
@@ -568,7 +573,6 @@ static int __init utv210_bat_init(void) {
 static void __exit utv210_bat_exit(void) {
     printk("*** %s ***\n", __func__);
     platform_driver_unregister(&utv210_bat_driver);
-    gpio_free(nGPIO_AC_Connected);
 }
 
 module_init(utv210_bat_init);
