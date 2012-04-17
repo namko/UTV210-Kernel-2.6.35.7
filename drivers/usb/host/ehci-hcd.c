@@ -1191,13 +1191,20 @@ static int __init ehci_hcd_init(void)
 
 #ifdef	CONFIG_PM
     // namko: Turn on the USB host power.
-    unsigned int nGPIO = S5PV210_GPH2(0);
-    gpio_request(nGPIO, "smdk-usb-host-0");
+    unsigned int nGPIO = S5PV210_GPH2(5);
+    gpio_request(nGPIO, "smdk-usb-host-1");
     gpio_direction_output(nGPIO, 1);
     gpio_free(nGPIO);
 
-    nGPIO = S5PV210_GPH2(5);
-    gpio_request(nGPIO, "smdk-usb-host-1");
+    nGPIO = S5PV210_GPH2(0);
+    gpio_request(nGPIO, "smdk-usb-host-0");
+    gpio_direction_output(nGPIO, 0);
+    gpio_free(nGPIO);
+
+    mdelay(100);
+
+    nGPIO = S5PV210_GPH2(0);
+    gpio_request(nGPIO, "smdk-usb-host-0");
     gpio_direction_output(nGPIO, 1);
     gpio_free(nGPIO);
 #endif
@@ -1295,12 +1302,7 @@ static void __exit ehci_hcd_cleanup(void)
 
 #ifdef	CONFIG_PM
     // namko: Turn off the USB host power.
-    unsigned int nGPIO = S5PV210_GPH2(0);
-    gpio_request(nGPIO, "smdk-usb-host-0");
-    gpio_direction_output(nGPIO, 0);
-    gpio_free(nGPIO);
-
-    nGPIO = S5PV210_GPH2(5);
+    unsigned int nGPIO = S5PV210_GPH2(5);
     gpio_request(nGPIO, "smdk-usb-host-1");
     gpio_direction_output(nGPIO, 0);
     gpio_free(nGPIO);
