@@ -29,7 +29,7 @@
 #define DEVICE_NAME			"mma7660"
 #define ONEGVALUE			21
 #define	AXIS_MAX			(ONEGVALUE/2)
-#define POLL_INTERVAL		20
+#define POLL_INTERVAL		10
 #define RES_BUFF_LEN		160
 
 #undef DBG
