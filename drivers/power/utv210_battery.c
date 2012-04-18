@@ -66,7 +66,6 @@ static char *status_text[] = {
 
 typedef enum {
     CHARGER_BATTERY = 0,
-    CHARGER_USB,
     CHARGER_AC,
     CHARGER_DISCHARGE
 } charger_type_t;
@@ -81,7 +80,7 @@ struct battery_info {
     u32 batt_temp_adc_cal;      /* Battery Temperature ADC value (calibrated) */
     u32 batt_current;           /* Battery current from ADC */
     u32 level;                  /* formula */
-    u32 charging_source;        /* 0: no cable, 1:usb, 2:AC */
+    u32 charging_source;        /* 0: no cable, 1:AC */
     u32 charging_enabled;       /* 0: Disable, 1: Enable */
     u32 batt_health;            /* Battery Health (Authority) */
     u32 batt_is_full;           /* 0 : Not full 1: Full */
@@ -135,7 +134,6 @@ static int utv210_bat_get_charging_status(void) {
     case CHARGER_BATTERY:
         ret = POWER_SUPPLY_STATUS_NOT_CHARGING;
         break;
-    case CHARGER_USB:
     case CHARGER_AC:
         if (utv210_bat_info.level == 100 
             && utv210_bat_info.batt_is_full) {
@@ -202,8 +200,6 @@ static int utv210_power_get_property(struct power_supply *bat_ps,
     case POWER_SUPPLY_PROP_ONLINE:
         if (bat_ps->type == POWER_SUPPLY_TYPE_MAINS)
             val->intval = (charger == CHARGER_AC ? 1 : 0);
-        else if (bat_ps->type == POWER_SUPPLY_TYPE_USB)
-            val->intval = (charger == CHARGER_USB ? 1 : 0);
         else
             val->intval = 0;
         break;
@@ -348,15 +344,6 @@ static struct power_supply utv210_power_supplies[] = {
         .get_property = utv210_bat_get_property,
     },
     {
-        .name = "usb",
-        .type = POWER_SUPPLY_TYPE_USB,
-        .supplied_to = supply_list,
-        .num_supplicants = ARRAY_SIZE(supply_list),
-        .properties = utv210_power_properties,
-        .num_properties = ARRAY_SIZE(utv210_power_properties),
-        .get_property = utv210_power_get_property,
-    },
-    {
         .name = "ac",
         .type = POWER_SUPPLY_TYPE_MAINS,
         .supplied_to = supply_list,
@@ -381,10 +368,6 @@ static int s3c_cable_status_update(int status) {
         dev_dbg(dev, "%s : cable NOT PRESENT\n", __func__);
         utv210_bat_info.charging_source = CHARGER_BATTERY;
         break;
-    case CHARGER_USB:
-        dev_dbg(dev, "%s : cable USB\n", __func__);
-        utv210_bat_info.charging_source = CHARGER_USB;
-        break;
     case CHARGER_AC:
         dev_dbg(dev, "%s : cable AC\n", __func__);
         utv210_bat_info.charging_source = CHARGER_AC;
@@ -399,19 +382,9 @@ static int s3c_cable_status_update(int status) {
     }
     source = utv210_bat_info.charging_source;
 
-    if (source == CHARGER_USB || source == CHARGER_AC) {
-        wake_lock(&vbus_wake_lock);
-    } else {
-        /* give userspace some time to see the uevent and update
-         * LED state or whatnot...
-         */
-        wake_lock_timeout(&vbus_wake_lock, HZ / 2);
-    }
-
     /* if the power source changes, all power supplies may change state */
     power_supply_changed(&utv210_power_supplies[CHARGER_BATTERY]);
     /*
-    power_supply_changed(&utv210_power_supplies[CHARGER_USB]);
     power_supply_changed(&utv210_power_supplies[CHARGER_AC]);
     */
     dev_dbg(dev, "%s : call power_supply_changed\n", __func__);
@@ -451,8 +424,7 @@ void s3c_cable_check_status(int flag) {
 
     if (flag == 0)  // Battery
         status = CHARGER_BATTERY;
-    else            // USB
-        status = CHARGER_USB;
+
     s3c_cable_status_update(status);
 }
 EXPORT_SYMBOL(s3c_cable_check_status);
@@ -567,12 +539,15 @@ static struct platform_driver utv210_bat_driver = {
 static int __init utv210_bat_init(void) {
     printk("*** %s ***\n", __func__);
     wake_lock_init(&vbus_wake_lock, WAKE_LOCK_SUSPEND, "vbus_present");
+    wake_lock(&vbus_wake_lock);
     return platform_driver_register(&utv210_bat_driver);
 }
 
 static void __exit utv210_bat_exit(void) {
     printk("*** %s ***\n", __func__);
     platform_driver_unregister(&utv210_bat_driver);
+    wake_unlock(&vbus_wake_lock);
+    wake_lock_destroy(&vbus_wake_lock);
 }
 
 module_init(utv210_bat_init);
