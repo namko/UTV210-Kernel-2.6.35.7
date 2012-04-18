@@ -20,7 +20,6 @@
 #include <linux/mutex.h>
 #include <linux/i2c.h>
 #include <linux/err.h>
-#include <linux/input-polldev.h>
 #include <linux/input.h>
 #include <linux/hwmon.h>
 #include <linux/irq.h>
@@ -28,12 +27,10 @@
 #include <linux/workqueue.h>
 
 #define DEVICE_NAME			"mma7660"
-#define ABS_DEVICE_NAME		"mma7660abs"
 #define ONEGVALUE			21
 #define	AXIS_MAX			(ONEGVALUE/2)
 #define POLL_INTERVAL		20
 #define RES_BUFF_LEN		160
-#define ATKBD_SPECIAL		248
 
 #undef DBG
 #define DBG(format, arg...) do { if (debug) printk(KERN_DEBUG "%s: " format "\n" , __FILE__ , ## arg); } while (0)
@@ -83,7 +80,6 @@ enum {
 	ACTIVE_MODE,
 };
 
-
 enum {
 	INT_1L_2P = 0,
 	INT_1P_2L,
@@ -100,30 +96,6 @@ struct mma7660_status {
 	u8 slider_key[4];
 };
 
-
-static unsigned char atkbd_keycode[512] = {
-	  0, 67, 65, 63, 61, 59, 60, 88,  0, 68, 66, 64, 62, 15, 41,117,
-	  0, 56, 42, 93, 29, 16,  2,  0,  0,  0, 44, 31, 30, 17,  3,  0,
-	  0, 46, 45, 32, 18,  5,  4, 95,  0, 57, 47, 33, 20, 19,  6,183,
-	  0, 49, 48, 35, 34, 21,  7,184,  0,  0, 50, 36, 22,  8,  9,185,
-	  0, 51, 37, 23, 24, 11, 10,  0,  0, 52, 53, 38, 39, 25, 12,  0,
-	  0, 89, 40,  0, 26, 13,  0,  0, 58, 54, 28, 27,  0, 43,  0, 85,
-	  0, 86, 91, 90, 92,  0, 14, 94,  0, 79,124, 75, 71,121,  0,  0,
-	 82, 83, 80, 76, 77, 72,  1, 69, 87, 78, 81, 74, 55, 73, 70, 99,
-
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	217,100,255,  0, 97,165,  0,  0,156,  0,  0,  0,  0,  0,  0,125,
-	173,114,  0,113,  0,  0,  0,126,128,  0,  0,140,  0,  0,  0,127,
-	159,  0,115,  0,164,  0,  0,116,158,  0,172,166,  0,  0,  0,142,
-	157,  0,  0,  0,  0,  0,  0,  0,155,  0, 98,  0,  0,163,  0,  0,
-	226,  0,  0,  0,  0,  0,  0,  0,  0,255, 96,  0,  0,  0,143,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,107,  0,105,102,  0,  0,112,
-	110,111,108,112,106,103,  0,119,  0,118,109,  0, 99,104,119,  0,
-
-	  0,  0,  0, 65, 99,
-};
-
-
 static ssize_t mma7660_show(struct device *dev,struct device_attribute *attr, char *buf);
 static ssize_t mma7660_store(struct device *dev,struct device_attribute *attr, const char *buf,size_t count);
 static int mma7660_suspend(struct i2c_client *client, pm_message_t state);
@@ -134,7 +106,7 @@ static void mma7660_poll_work(struct work_struct *work);
 static struct i2c_driver mma7660_driver;
 static int mma7660_probe(struct i2c_client *client,const struct i2c_device_id *id);
 static int mma7660_remove(struct i2c_client *client);
-static int mma7660_detect(struct i2c_client *client, int kind, struct i2c_board_info *info);
+static int mma7660_detect(struct i2c_client *client, struct i2c_board_info *info);
 
 static const struct i2c_device_id mma7660_id[] = {
 	{"mma7660", 0 },
@@ -144,18 +116,14 @@ static const struct i2c_device_id mma7660_id[] = {
 MODULE_DEVICE_TABLE(i2c, mma7660_id);
 
 static struct i2c_client 		*mma7660_client;
-static struct input_polled_dev 	*mma7660_idev;
-static struct input_dev			*mma7660_abs_dev;
+static struct input_dev			*mma7660_dev;
 
-static u8			mma_cal	= 0;
 static int 			debug = 0;
 static int 			poll_int = POLL_INTERVAL;	
 static char			res_buff[RES_BUFF_LEN];
-static int 			emu_joystick = 0;
 
+static struct delayed_work mma7660_work;
 static struct workqueue_struct *mma7660_workqueue;
-
-static DECLARE_WORK(mma7660_work, mma7660_poll_work);
 
 static struct i2c_driver mma7660_driver = {
 	.driver 	= {
@@ -355,74 +323,6 @@ static void cmd_dumpreg(void) {
 	sprintf(&(res_buff[strlen(res_buff)]),"\n");
 }
 
-/* do the axis translation */
-static void remap_axis(short *rem_x,short *rem_y,short *rem_z,short x,short y,short z) {
-
-	switch (mma_status.axis_dir_x) {
-		case AXIS_DIR_X:
-			*rem_x		= x;
-			break;
-		case AXIS_DIR_X_N:
-			*rem_x		= -x;
-			break;
-		case AXIS_DIR_Y:
-			*rem_x		= y;
-			break;
-		case AXIS_DIR_Y_N:
-			*rem_x		= -y;
-			break;
-		case AXIS_DIR_Z:
-			*rem_x		= z;
-			break;
-		case AXIS_DIR_Z_N:
-			*rem_x		= -z;
-			break;
-	}
-	
-	switch (mma_status.axis_dir_y) {
-		case AXIS_DIR_X:
-			*rem_y		= x;
-			break;
-		case AXIS_DIR_X_N:
-			*rem_y		= -x;
-			break;
-		case AXIS_DIR_Y:
-			*rem_y		= y;
-			break;
-		case AXIS_DIR_Y_N:
-			*rem_y		= -y;
-			break;
-		case AXIS_DIR_Z:
-			*rem_y		= z;
-			break;
-		case AXIS_DIR_Z_N:
-			*rem_y		= -z;
-			break;
-	}
-	
-	switch (mma_status.axis_dir_z) {
-		case AXIS_DIR_X:
-			*rem_z		= x;
-			break;
-		case AXIS_DIR_X_N:
-			*rem_z		= -x;
-			break;
-		case AXIS_DIR_Y:
-			*rem_z		= y;
-			break;
-		case AXIS_DIR_Y_N:
-			*rem_z		= -y;
-			break;
-		case AXIS_DIR_Z:
-			*rem_z		= z;
-			break;
-		case AXIS_DIR_Z_N:
-			*rem_z		= -z;
-			break;
-	}
-}
-
-
 /* set the Zslider key mapping */
 static void cmd_sliderkey(const char *arg) 
 {
@@ -576,11 +476,9 @@ mma_exec_command:
 			axis_dir[mma_status.axis_dir_y],axis_dir[mma_status.axis_dir_z]);
 		break;
 	case MMA_ENJOYSTICK: 
-		emu_joystick = 1;
 		sprintf(res_buff,"OK:joystick movement emulation enabled\n");
 		break;
 	case MMA_DISJOYSTICK:
-		emu_joystick = 0;
 		sprintf(res_buff,"OK:joystick movement emulation disabled\n");
 		break;
 	case MMA_SLIDER_KEY:			/* load offset drift registers	*/
@@ -639,90 +537,11 @@ struct slider {
 	unsigned char	cnt;	
 };
 
-static struct slider zsl_x,zsl_y,zsl_z;
-
-/* check for the zslider event */
-static int zslider(struct slider *slider, short axis) {
-	int i;
-	short average = 0;	
-
-	slider->wave[slider->wave_idx] 	= axis;
-
-	for (i = 0; i < SLIDERAVCOUNT; i++) 
-		average += slider->wave[i];
-
-	average /= SLIDERAVCOUNT;
-
-	switch (slider->mode) {
-		case 0:
-			if (slider->wave_idx == (SLIDERAVCOUNT - 1)) 
-				slider->mode = 1;
-			break;
-		case 1:
-			if (axis > (average + SLIDE_THR)) {	/* slide up trigger 		*/
-				slider->dir	= SLIDEUPWARD;
-				slider->mode 	= 2;
-				slider->cnt	= MAXSLIDEWIDTH;
-				slider->ref	= average;
-			} else if (axis < (average - SLIDE_THR)) {	/* slide down trigger 		*/
-				slider->dir	= SLIDEDOWNWARD;
-				slider->mode 	= 2;
-				slider->cnt	= MAXSLIDEWIDTH;
-				slider->ref	= average;
-			}
-			slider->report = NOSLIDE;
-			break;
-		case 2: 
-			slider->cnt--;
-
-			if (!slider->cnt) {				/* return to normal */
-				slider->mode	= 1; 	
-				slider->dir	= NOSLIDE;
-				break;
-			}
-
-			if ((axis < (slider->ref + SLIDE_THR)) && (axis > (slider->ref - SLIDE_THR)) && (slider->cnt < MAXSLIDEWIDTH-2)) {
-/* report the slide event */
-				switch (slider->dir) {
-					case SLIDEUPWARD:
-						DBG("slide upward\n");
-						break;
-					case SLIDEDOWNWARD:
-						DBG("slide downward\n");
-						break;
-				}
-
-				slider->mode 	= 3;
-				slider->cnt	= 5;    		/* add additonal delay */
-				slider->report	= slider->dir; 
-			}
-			break;
-
-		case 3:
-			slider->report = NOSLIDE;
-			slider->cnt --;
-			if (!slider->cnt) {
-				slider->mode = 1;
-			}
-			break;
-		default:
-			break;
-	}
-
-	slider->wave_idx++;
-	if (slider->wave_idx == SLIDERAVCOUNT) 
-		slider->wave_idx=0;
-
-        return slider->report;
-}
-
 /* workqueue function to poll mma7660 data */
 static void mma7660_poll_work(struct work_struct *work)  
 {
     short 	temp;
 	short 	x,y,z,tilt;
-	short 	x_remap,y_remap,z_remap;
-	u8 	zslide_x,zslide_y;
 
 	if (mma7660_read_data(&x, &y, &z, &tilt) != 0) {
 		DBG("mma7660 data read failed\n");
@@ -736,89 +555,21 @@ static void mma7660_poll_work(struct work_struct *work)
     y = temp;
 
 /* report the absulate sensor data to input device */
-    input_report_abs(mma7660_abs_dev, ABS_X, x);	
-    input_report_abs(mma7660_abs_dev, ABS_Y, y);	
-    input_report_abs(mma7660_abs_dev, ABS_Z, z);
-    input_report_abs(mma7660_abs_dev, ABS_MISC, tilt);
-    input_sync(mma7660_abs_dev);
+    input_report_abs(mma7660_dev, ABS_X, x);	
+    input_report_abs(mma7660_dev, ABS_Y, y);	
+    input_report_abs(mma7660_dev, ABS_Z, z);
+    input_report_abs(mma7660_dev, ABS_MISC, tilt);
+    input_sync(mma7660_dev);
 
-	remap_axis(&x_remap,&y_remap,&z_remap,x,y,z);
-
-/* report joystick movement */
-
-	if (emu_joystick)  {	
-		input_report_abs(mma7660_idev->input, ABS_X, x_remap);
-		input_report_abs(mma7660_idev->input, ABS_Y, y_remap);
-		input_report_abs(mma7660_idev->input, ABS_Z, z_remap-ONEGVALUE);
-		input_sync(mma7660_idev->input);
-	}
-
-
-/* check the zslider event */
-
-	zslide_x 	= zslider(&zsl_x,x_remap);
-	zslide_y	= zslider(&zsl_y,y_remap);
-	
-	switch (zslide_x) {
-		case SLIDEUPWARD: 
-			DBG("X report slide upward \n");
-			if (mma_status.slider_key[SLIDER_X_UP]) {
-				input_report_key(mma7660_idev->input, mma_status.slider_key[SLIDER_X_UP], 1);
-				input_report_key(mma7660_idev->input, mma_status.slider_key[SLIDER_X_UP], 0);
-			}
-			break;
-		case SLIDEDOWNWARD:
-			DBG("X report slide downward \n");
-			if (mma_status.slider_key[SLIDER_X_DOWN]) {
-				input_report_key(mma7660_idev->input, mma_status.slider_key[SLIDER_X_DOWN], 1);
-				input_report_key(mma7660_idev->input, mma_status.slider_key[SLIDER_X_DOWN], 0);
-			}
-			break;
-	}
-	
-	switch (zslide_y) {
-		case SLIDEUPWARD: 
-			DBG("Y report slide upward \n");
-			if (mma_status.slider_key[SLIDER_Y_UP]) {
-				input_report_key(mma7660_idev->input, mma_status.slider_key[SLIDER_Y_UP], 1);
-				input_report_key(mma7660_idev->input, mma_status.slider_key[SLIDER_Y_UP], 0);
-			}
-			break;
-		case SLIDEDOWNWARD:
-			DBG("Y report slide downward \n");
-			if (mma_status.slider_key[SLIDER_Y_DOWN]) {
-				input_report_key(mma7660_idev->input, mma_status.slider_key[SLIDER_Y_DOWN], 1);
-				input_report_key(mma7660_idev->input, mma_status.slider_key[SLIDER_Y_DOWN], 0);
-			}
-			break;
-	}
-	
-
-	if ((zslide_x) || (zslide_y)) {
-		input_sync(mma7660_idev->input);
-	};
+// Schedule next update.
+    queue_delayed_work(mma7660_workqueue, &mma7660_work, HZ * POLL_INTERVAL / 1000);
 
 	return;
 
-}
-
- 
-/* polling callback function of input polled device */
-static void mma7660_dev_poll(struct input_polled_dev *dev)
-{
-	if (mma_cal) {
-		DBG("mma7660 is now doing calibration\n");
-		return;
-	}
-
-/* Since the the data reading would take a long time, 
-   schedule the real work to a workqueue */
-	queue_work(mma7660_workqueue, &mma7660_work);
-	return;
 }
 
 /* detecting mma7660 chip */
-static int mma7660_detect(struct i2c_client *client, int kind, struct i2c_board_info *info) {
+static int mma7660_detect(struct i2c_client *client, struct i2c_board_info *info) {
         struct i2c_adapter *adapter = client->adapter;
 
         if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE
@@ -831,107 +582,53 @@ static int mma7660_detect(struct i2c_client *client, int kind, struct i2c_board_
 }
 
 static int mma7660_probe(struct i2c_client *client,const struct i2c_device_id *id) {
-	struct input_dev 	*idev;
 	int 			rc; 
 	int 			ret;
-	int 			i;
 
+	printk("*** %s ***\n", __func__);
 	printk(KERN_INFO "try to detect mma7660 chip id %02x\n",client->addr);
 
-	mma7660_workqueue = create_singlethread_workqueue("mma7660");
-        if (!mma7660_workqueue) {
-	        return -ENOMEM; /* most expected reason */
-        }
-
-	DBG("1 try to create file\n");
+    if (!(mma7660_workqueue = create_singlethread_workqueue(DEVICE_NAME))) 
+        return -ENOMEM; /* most expected reason */
 
 	mma7660_client = client;
 
-	DBG("2 try to create file\n");
-
-/* create device file in sysfs as user interface */
-	ret = device_create_file(&client->dev, &mma7660_dev_attr);
-	DBG("create file\n");
-	if (ret) {
-		DBG("create file failed\n");	
+    /* create device file in sysfs as user interface */
+	if ((ret = device_create_file(&client->dev, &mma7660_dev_attr))) {
 		dev_err(&client->dev, "create device file failed!\n");
 		rc = -EINVAL;
 		goto err_detach_client;
 	}
 
-	DBG("3 try to create file\n");
+    /* allocate & register input polling device  */
+	mma7660_dev = input_allocate_device();
 
-
-/* allocate & register input polling device  */
-	mma7660_idev = input_allocate_polled_device();
-	if (!mma7660_idev) {
-		dev_err(&client->dev, "allocate poll device failed!\n");
-		rc = -ENOMEM;
-		goto err_free_input;
-	}
-
-	mma7660_abs_dev = input_allocate_device();
-
-	if (!mma7660_abs_dev) {
+	if (!mma7660_dev) {
 		dev_err(&client->dev, "allocate poll device failed!\n");
 		rc = -ENOMEM;
 		goto err_free_abs;
 	}
 
+	mma7660_dev->name		= DEVICE_NAME;
+	mma7660_dev->id.bustype	= BUS_I2C;
+	mma7660_dev->dev.parent	= &client->dev;
 
-	mma7660_idev->poll 				= mma7660_dev_poll;
-	mma7660_idev->poll_interval 	= poll_int;
+	set_bit(EV_REL,mma7660_dev->evbit);
+	set_bit(EV_KEY,mma7660_dev->evbit);
 
-	idev 				= mma7660_idev->input;
-	idev->name 			= DEVICE_NAME;
-	idev->id.bustype 	= BUS_I2C;
-	idev->dev.parent 	= &client->dev;
+	set_bit(EV_ABS,mma7660_dev->evbit);
+	set_bit(ABS_X,mma7660_dev->absbit);
+	set_bit(ABS_Y,mma7660_dev->absbit);
+	set_bit(ABS_Z,mma7660_dev->absbit);
+	set_bit(ABS_MISC,mma7660_dev->absbit);
 
-	set_bit(EV_REL,idev->evbit);
-	set_bit(EV_KEY,idev->evbit);
-
-	input_set_abs_params(mma7660_idev->input, ABS_X, -AXIS_MAX, AXIS_MAX, 0, 0);
-	input_set_abs_params(mma7660_idev->input, ABS_Y, -AXIS_MAX, AXIS_MAX, 0, 0);
-	input_set_abs_params(mma7660_idev->input, ABS_Z, -AXIS_MAX, AXIS_MAX, 0, 0);
-	set_bit(EV_ABS, mma7660_idev->input->evbit);
-
-	idev->keycode = atkbd_keycode;
-	idev->keycodesize = sizeof(unsigned char);
-	idev->keycodemax = ARRAY_SIZE(atkbd_keycode);
-
-	for (i = 0; i < 512; i++)
-		if (atkbd_keycode[i] && atkbd_keycode[i] < ATKBD_SPECIAL)
-			set_bit(atkbd_keycode[i], idev->keybit);
-
-	mma7660_abs_dev->name		= ABS_DEVICE_NAME;
-	mma7660_abs_dev->id.bustype	= BUS_I2C;
-	mma7660_abs_dev->dev.parent	= &client->dev;
-
-	set_bit(EV_ABS,mma7660_abs_dev->evbit);
-	set_bit(ABS_X,mma7660_abs_dev->absbit);
-	set_bit(ABS_Y,mma7660_abs_dev->absbit);
-	set_bit(ABS_Z,mma7660_abs_dev->absbit);
-	set_bit(ABS_MISC,mma7660_abs_dev->absbit);
-
-
-	ret = input_register_polled_device(mma7660_idev);
-	if (ret) {
-		dev_err(&client->dev, "register poll device failed!\n");
-		rc = -EINVAL;
-		goto err_unreg_input;
-	}
-
-
-	ret = input_register_device(mma7660_abs_dev);
+	ret = input_register_device(mma7660_dev);
 	if (ret) {
 		dev_err(&client->dev, "register abs device failed!\n");
 		rc = -EINVAL;
 		goto err_unreg_abs_input;
 	}
 
-	memset(&zsl_x,0,sizeof(struct slider));
-	memset(&zsl_y,0,sizeof(struct slider));
-	memset(&zsl_z,0,sizeof(struct slider));
 	memset(res_buff,0,RES_BUFF_LEN);
 
 /* enable gSensor mode 8g, measure */
@@ -942,15 +639,15 @@ static int mma7660_probe(struct i2c_client *client,const struct i2c_device_id *i
 	i2c_smbus_write_byte_data(client, REG_SR, 0x6B);		/* 4 measurement, 16 sample  */
 	i2c_smbus_write_byte_data(client, REG_MODE, 0x01);		/* active mode   */
 
+    // init delayed work struct and workqueue.
+    INIT_DELAYED_WORK(&mma7660_work, mma7660_poll_work);
+    queue_delayed_work(mma7660_workqueue, &mma7660_work, 0);
+
 	return 0;
 err_unreg_abs_input:
-	input_unregister_device(mma7660_abs_dev);
-err_unreg_input:
-	input_unregister_polled_device(mma7660_idev);
+	input_unregister_device(mma7660_dev);
 err_free_abs:
-	input_free_device(mma7660_abs_dev);
-err_free_input:
-	input_free_polled_device(mma7660_idev);
+	input_free_device(mma7660_dev);
 
 err_detach_client:
 	destroy_workqueue(mma7660_workqueue);
@@ -961,11 +658,10 @@ err_detach_client:
 
 
 static int mma7660_remove(struct i2c_client *client)  {
+	printk("*** %s ***\n", __func__);
 
-	input_unregister_device(mma7660_abs_dev);
-	input_unregister_polled_device(mma7660_idev);
-	input_free_device(mma7660_abs_dev);
-	input_free_polled_device(mma7660_idev);
+	input_unregister_device(mma7660_dev);
+	input_free_device(mma7660_dev);
 
 	device_remove_file(&client->dev, &mma7660_dev_attr);
 
@@ -980,25 +676,25 @@ static int mma7660_remove(struct i2c_client *client)  {
 
 static int mma7660_suspend(struct i2c_client *client, pm_message_t state)
 {
+	printk("*** %s ***\n", __func__);
 	mma_status.mode = i2c_smbus_read_byte_data(mma7660_client, REG_MODE);
 	i2c_smbus_write_byte_data(mma7660_client, REG_MODE,mma_status.mode & ~0x3);
-	DBG("MMA7660 suspended\n");
 	return 0;
 }
 
 static int mma7660_resume(struct i2c_client *client)
 {
+	printk("*** %s ***\n", __func__);
 	i2c_smbus_write_byte_data(mma7660_client, REG_MODE, mma_status.mode);
-	DBG("MMA7660 resumed\n");
 	return 0;
 }
-
 
 static int __init init_mma7660(void)
 {
 /* register driver */
 	int res;
 
+	printk("*** %s ***\n", __func__);
 	res = i2c_add_driver(&mma7660_driver);
 	if (res < 0){
 		printk(KERN_INFO "add mma7660 i2c driver failed\n");
@@ -1011,7 +707,7 @@ static int __init init_mma7660(void)
 
 static void __exit exit_mma7660(void)
 {
-	printk(KERN_INFO "remove mma7660 i2c driver.\n");
+	printk("*** %s ***\n", __func__);
 	return i2c_del_driver(&mma7660_driver);
 }
 
@@ -1020,11 +716,9 @@ module_init(init_mma7660);
 module_exit(exit_mma7660);
 
 module_param(debug, bool, S_IRUGO | S_IWUSR);
-module_param(emu_joystick, bool, S_IRUGO | S_IWUSR);
 module_param(poll_int, int, S_IRUGO | S_IWUSR);
 
 MODULE_PARM_DESC(debug, "1: Enable verbose debugging messages");
-MODULE_PARM_DESC(emu_joystick, "1: Enable emulation of joystick movement by tilt");
 MODULE_PARM_DESC(poll_int, "set the poll interval of gSensor data (unit: ms)");
 
 MODULE_AUTHOR("Freescale Semiconductor, Inc.");
