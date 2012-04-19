@@ -32,6 +32,16 @@
 #define POLL_INTERVAL_IN_SECS   3
 #define NUMBER_OF_SAMPLES       10
 
+// namko: To prevent rapidly-varying/spurious battery percentages the
+// ADC's value should be integrated over an interval of time. Currently
+// this is set to a minute and appears to provide reasonable data.
+#define POLL_INTERVAL_IN_SECS   3
+#define NUMBER_OF_VALUES_AVG    20
+
+// NOTE battery-full is valid only when AC is connected!
+static const int nGPIO_AC_Connected = S5PV210_GPH3(6);
+static const int nGPIO_Battery_Full = S5PV210_GPH0(2);
+
 // namko: Experiments reveal that maximum value of ADCIN0 is about 3300
 // for full battery and reduces by approximately 6 for every percent.
 static const int ADC_MAX_MV = 3300, ADC_MIN_MV = 2600;
@@ -356,7 +366,7 @@ static struct power_supply utv210_power_supplies[] = {
 
 static int s3c_cable_status_update(int status) {
     int ret = 0;
-    charger_type_t source = CHARGER_BATTERY;
+    charger_type_t old_source = utv210_bat_info.charging_source;
 
     dev_dbg(dev, "%s\n", __func__);
 
@@ -380,13 +390,13 @@ static int s3c_cable_status_update(int status) {
         dev_err(dev, "%s : Nat supported status\n", __func__);
         ret = -EINVAL;
     }
-    source = utv210_bat_info.charging_source;
 
     /* if the power source changes, all power supplies may change state */
+    if (old_source != utv210_bat_info.charging_source)
+        power_supply_changed(&utv210_power_supplies[CHARGER_AC]);
+
     power_supply_changed(&utv210_power_supplies[CHARGER_BATTERY]);
-    /*
-    power_supply_changed(&utv210_power_supplies[CHARGER_AC]);
-    */
+
     dev_dbg(dev, "%s : call power_supply_changed\n", __func__);
     return ret;
 }
@@ -420,12 +430,7 @@ static void utv210_bat_status_update(struct power_supply *bat_ps) {
 }
 
 void s3c_cable_check_status(int flag) {
-    charger_type_t status = 0;
-
-    if (flag == 0)  // Battery
-        status = CHARGER_BATTERY;
-
-    s3c_cable_status_update(status);
+    // Nothing here.
 }
 EXPORT_SYMBOL(s3c_cable_check_status);
 
@@ -444,14 +449,21 @@ static int utv210_bat_resume(struct platform_device *pdev) {
 #define utv210_bat_resume NULL
 #endif /* CONFIG_PM */
 
+static int last_voltage_ptr, num_active_voltages;
+static unsigned int last_voltages[NUMBER_OF_VALUES_AVG];
 static struct delayed_work battery_watcher_work;
 
 static void battery_watcher(struct work_struct *work) {
     int i;
     unsigned int sum, min, max;
+    bool ac_connected, battery_full;
     static unsigned int readings[NUMBER_OF_SAMPLES];
 
     dev_dbg(dev, "*** %s: ***\n", __func__);
+
+    // Read GPIOs.
+    ac_connected = gpio_get_value(nGPIO_AC_Connected) ? true : false;
+    battery_full = gpio_get_value(nGPIO_Battery_Full) ? false : true;
 
     // Read ADC.
     for (i = 0, sum = 0; i < NUMBER_OF_SAMPLES; i++) {
@@ -469,9 +481,27 @@ static void battery_watcher(struct work_struct *work) {
         }
     }
     
+    // Update history.
+    last_voltages[last_voltage_ptr++] = (sum - min - max) / (NUMBER_OF_SAMPLES - 2);
+
+    if (num_active_voltages < last_voltage_ptr)
+        num_active_voltages = last_voltage_ptr;
+
+    last_voltage_ptr %= NUMBER_OF_VALUES_AVG;
+
+    for (i = 0, sum = 0; i < num_active_voltages; i++)
+        sum += last_voltages[i];
+
     // Update battery.
-    utv210_bat_info.batt_vol_adc = (sum - min - max) / (NUMBER_OF_SAMPLES - 2);
+    utv210_bat_info.batt_vol_adc = sum / num_active_voltages;
+
+    // full-battery GPIO is only valid if AC is connected.
+    if (ac_connected && battery_full)
+        utv210_bat_info.batt_vol_adc = ADC_MAX_MV;
+
+    // Update cable and battery status(es).
     utv210_bat_status_update(&utv210_power_supplies[CHARGER_BATTERY]);
+    s3c_cable_status_update(ac_connected ? CHARGER_AC : CHARGER_BATTERY);
     schedule_delayed_work(&battery_watcher_work, HZ * POLL_INTERVAL_IN_SECS);
 }
 
@@ -501,6 +531,11 @@ static int __devinit utv210_bat_probe(struct platform_device *pdev) {
             dev_err(dev, "Failed to register power supply %d,%d\n", i, ret);
             goto __end__;
         }
+
+    // namko: Initialize voltage history variables.
+    last_voltage_ptr = 0;
+    num_active_voltages = 0;
+    memset(last_voltages, 0, sizeof(last_voltages));
 
     /* create detail attributes */
     utv210_bat_create_attrs(utv210_power_supplies[CHARGER_BATTERY].dev);
@@ -538,16 +573,32 @@ static struct platform_driver utv210_bat_driver = {
 
 static int __init utv210_bat_init(void) {
     printk("*** %s ***\n", __func__);
+
+    // namko: Request GPIOs for polling battery status and configure them.
+    gpio_request(nGPIO_AC_Connected, "ac-connected");
+    gpio_request(nGPIO_Battery_Full, "battery-full");
+    gpio_direction_input(nGPIO_AC_Connected);
+    gpio_direction_input(nGPIO_Battery_Full);
+    s3c_gpio_setpull(nGPIO_AC_Connected, S3C_GPIO_PULL_NONE);
+    s3c_gpio_setpull(nGPIO_Battery_Full, S3C_GPIO_PULL_NONE);
+
+    // namko: Get a wake-lock (TEMPORARY work-around until solution
+    // for freeze-on-suspend is found).
     wake_lock_init(&vbus_wake_lock, WAKE_LOCK_SUSPEND, "vbus_present");
     wake_lock(&vbus_wake_lock);
+
     return platform_driver_register(&utv210_bat_driver);
 }
 
 static void __exit utv210_bat_exit(void) {
     printk("*** %s ***\n", __func__);
     platform_driver_unregister(&utv210_bat_driver);
+
     wake_unlock(&vbus_wake_lock);
     wake_lock_destroy(&vbus_wake_lock);
+
+    gpio_free(nGPIO_AC_Connected);
+    gpio_free(nGPIO_Battery_Full);
 }
 
 module_init(utv210_bat_init);
