@@ -695,13 +695,65 @@ static struct s3cfb_lcd lcd_ut7gm = {
 	},
 };
 
+static struct s3cfb_lcd lcd_ut08gm = {
+	.width = 800,
+	.height = 600,
+	.p_width = 163,
+	.p_height = 122,
+	.bpp = 32,
+	.freq = 60,
+
+	.timing = {
+		.h_fp = 50,
+		.h_bp = 150,
+		.h_sw = 60,
+		.v_fp = 30,
+		.v_fpe = 1,
+		.v_bp = 30,
+		.v_bpe = 1,
+		.v_sw = 2,
+	},
+	.polarity = {
+		.rise_vclk = 1,
+		.inv_hsync = 1,
+		.inv_vsync = 1,
+		.inv_vden = 0,
+	},
+};
+
+static struct s3cfb_lcd lcd_ut10gm = {
+	.width = 1024,
+	.height = 600,
+	.p_width = 221,
+	.p_height = 130,
+	.bpp = 32,
+	.freq = 60,
+
+	.timing = {
+		.h_fp = 24,
+		.h_bp = 160,
+		.h_sw = 136,
+		.v_fp = 0,
+		.v_fpe = 1,
+		.v_bp = 22,
+		.v_bpe = 1,
+		.v_sw = 3,
+	},
+	.polarity = {
+		.rise_vclk = 0,
+		.inv_hsync = 1,
+		.inv_vsync = 1,
+		.inv_vden = 0,
+	},
+};
+
 static struct s3c_platform_fb utv210_fb_data __initdata = {
 	.hw_ver	= 0x62,
 	.nr_wins = 5,
 	.default_win = CONFIG_FB_S3C_DEFAULT_WINDOW,
 	.swap = FB_SWAP_WORD | FB_SWAP_HWORD,
 
-	.lcd                = &lcd_ut7gm,
+	.lcd                = NULL,
 	.cfg_gpio	        = s3cfb_cfg_gpio,
 	.backlight_on	    = s3cfb_backlight_on,
 	.backlight_off      = s3cfb_backlight_off,
@@ -709,6 +761,31 @@ static struct s3c_platform_fb utv210_fb_data __initdata = {
     .lcd_off            = s3cfb_lcd_off,
 	.reset_lcd	        = s3cfb_reset_lcd,
 };
+
+static void smdkc110_detect_lcd(void) {
+    if (!strcmp(g_Model, "1024") ||
+            !strcmp(g_Model, "1024n") ||  
+            !strcmp(g_LCD, "lp101") ||
+            !strcmp(g_LCD, "lp101wh1")) {
+        // Coby 1024
+        printk("Selecting 10.1\" LCD...\n");
+        utv210_fb_data.lcd = &lcd_ut10gm;
+    } else if (!strcmp(g_Model, "8024") || 
+            !strcmp(g_LCD, "ut08gm")) {
+        // Coby 8024
+        printk("Selecting 8.0\" LCD...\n");
+        utv210_fb_data.lcd = &lcd_ut08gm;
+    } else if (!strcmp(g_Model, "703") || 
+            !strcmp(g_LCD, "ut7gm")) {
+        // Herotab C8/Dropad A8/Haipad M7/iBall Slide
+        printk("Selecting 7.0\" LCD...\n");
+        utv210_fb_data.lcd = &lcd_ut7gm;
+    } else {
+        // At this point, the kernel will panic in S3CFB initialization code
+        // because "utv210_fb_data.lcd" is set to NULL.
+        printk("\n\n\n\n *** FATAL ERROR: cannot determine LCD ***\n\n\n");
+    }
+}
 
 #ifdef CONFIG_S3C64XX_DEV_SPI
 
@@ -1460,6 +1537,7 @@ static void __init smdkc110_machine_init(void)
 	arm_pm_restart = smdkc110_pm_restart;
 
     utv210_init_cfg();
+    smdkc110_detect_lcd();
 
 	s3c_usb_set_serial();
 	platform_add_devices(smdkc110_devices, ARRAY_SIZE(smdkc110_devices));
