@@ -761,7 +761,6 @@ static void s3cfb_init_fbinfo(struct s3cfb_global *ctrl, int id)
 				(var->upper_margin + var->lower_margin +
 				var->vsync_len + var->yres);
 
-    // namko: Removed the 1.5x multiplier for LTE480WV.
 	dev_dbg(ctrl->dev, "pixclock: %d\n", var->pixclock);
 
 	s3cfb_set_bitfield(var);
@@ -917,9 +916,6 @@ static int __devinit s3cfb_probe(struct platform_device *pdev)
 		goto err_global;
 	}
 	fbdev->dev = &pdev->dev;
-#ifdef CONFIG_FB_S3C_LTE480WV
-	s3cfb_set_lcd_info(fbdev);
-#endif
 
 	fbdev->regulator = regulator_get(&pdev->dev, "pd");
 	if (!fbdev->regulator) {
@@ -940,7 +936,7 @@ static int __devinit s3cfb_probe(struct platform_device *pdev)
 		goto err_pdata;
 	}
 
-	//fbdev->lcd = (struct s3cfb_lcd *)pdata->lcd;
+	fbdev->lcd = (struct s3cfb_lcd *)pdata->lcd;
 
 	if (pdata->cfg_gpio)
 		pdata->cfg_gpio(pdev);
@@ -1131,18 +1127,10 @@ void s3cfb_early_suspend(struct early_suspend *h)
 
 	pr_debug("s3cfb_early_suspend is called\n");
 
-#if 0 /*to be checked*/
-	/* backlight_onoff function is only used for backlight_off */
-	if (pdata->backlight_onoff)
-		pdata->backlight_onoff(pdev, false);
-#else
-
-#if defined (CONFIG_FB_S3C_LTE480WV)
 	if (pdata->backlight_off)
 		pdata->backlight_off(pdev);
-#endif
-
-#endif
+	else if (pdata->backlight_onoff)
+		pdata->backlight_onoff(pdev, 0);
 
 	s3cfb_display_off(fbdev);
 	clk_disable(fbdev->clock);
@@ -1150,17 +1138,13 @@ void s3cfb_early_suspend(struct early_suspend *h)
 	lcd_cfg_gpio_early_suspend();
 #endif
 
-	
 	regulator_disable(fbdev->regulator);
-#if defined (CONFIG_FB_S3C_LTE480WV)	//=//
-	//s3cfb_lcd_off(pdev);
-	if(pdata->lcd_off)
+
+	if (pdata->lcd_off)
 		pdata->lcd_off(pdev);
+
 	if (pdata->cfg_gpio)
-	{		
 		s3cfb_earlysuspend_cfg_gpio(pdev);
-	}
-#endif
 
 	return ;
 }
@@ -1180,13 +1164,8 @@ void s3cfb_late_resume(struct early_suspend *h)
 	ret = regulator_enable(fbdev->regulator);
 	if (ret < 0)
 		dev_err(fbdev->dev, "failed to enable regulator\n");
-#if defined (CONFIG_FB_S3C_LTE480WV)
-	s3cfb_lateresume_cfg_gpio(pdev);
-	//s3cfb_lcd_on(pdev);
-	//if(pdata->lcd_on)
-		//pdata->lcd_on(pdev);
-#endif
 
+	s3cfb_lateresume_cfg_gpio(pdev);
 
 #if defined(CONFIG_FB_S3C_TL2796)
 	lcd_cfg_gpio_late_resume();
@@ -1224,6 +1203,8 @@ void s3cfb_late_resume(struct early_suspend *h)
 
 	if (pdata->backlight_on)
 		pdata->backlight_on(pdev);
+    else if (pdata->backlight_onoff)
+		pdata->backlight_onoff(pdev, 1);
 
 	pr_info("s3cfb_late_resume is complete\n");
 	return ;

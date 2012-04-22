@@ -149,16 +149,12 @@ static struct s3c2410_uartcfg smdkc110_uartcfgs[] __initdata = {
 	},
 };
 
-#define S5PV210_LCD_WIDTH 800
-#define S5PV210_LCD_HEIGHT 480
-
 #define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_FIMC0 (6144 * SZ_1K)
 #define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_FIMC1 (9900 * SZ_1K)
 #define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_FIMC2 (6144 * SZ_1K)
 #define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_MFC0 (36864 * SZ_1K)
 #define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_MFC1 (36864 * SZ_1K)
-#define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_FIMD (S5PV210_LCD_WIDTH * \
-					     S5PV210_LCD_HEIGHT * 4 * \
+#define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_FIMD (3072 * SZ_1K * \
 					     CONFIG_FB_S3C_NR_BUFFERS)
 #define  S5PV210_VIDEO_SAMSUNG_MEMSIZE_JPEG (8192 * SZ_1K)
 
@@ -673,14 +669,14 @@ static void __init smdkc110_dm9000_set(void)
 }
 #endif
 
-#ifdef CONFIG_FB_S3C_LTE480WV
-static struct s3cfb_lcd lte480wv = {
-	.width = S5PV210_LCD_WIDTH,
-	.height = S5PV210_LCD_HEIGHT,
+static struct s3cfb_lcd lcd_ut7gm = {
+	.width = 800,
+	.height = 480,
+	.p_width = 152,
+	.p_height = 91,
 	.bpp = 32,
 	.freq = 60,
 
-    // namko: Fix LCD timings.
 	.timing = {
 		.h_fp = 10,
 		.h_bp = 78,
@@ -699,113 +695,20 @@ static struct s3cfb_lcd lte480wv = {
 	},
 };
 
-static void lte480wv_cfg_gpio(struct platform_device *pdev)
-{
-    // namko: Same as this function.
-	s3cfb_cfg_gpio(pdev);
-}
-
-static int lte480wv_backlight_onoff(struct platform_device *pdev, int onoff)
-{
-    int err;
-
-    // mg3100: GPH2[4] LCD backlight
-    unsigned int nGPIO = S5PV210_GPH2(4);
-	err = gpio_request(nGPIO, "backlight-en");
-
-	if (err) {
-		printk(KERN_ERR "failed to request GPH2[4] for backlight control\n");
-		return err;
-	}
-
-    if (onoff)
-        gpio_direction_output(nGPIO, 1);
-    else
-        gpio_direction_output(nGPIO, 0);
-
-	mdelay(10);
-    gpio_free(nGPIO);
-
-	return 0;
-}
-
-static int lte480wv_lcd_onoff(struct platform_device *pdev, int onoff)
-{
-    int err;
-
-    // namko: Use GPH1[6] and GPH1[7] to control LCD power (including backlight)
-    unsigned int nGPIOs[] = {S5PV210_GPH1(6), S5PV210_GPH1(7)};
-
-	if ((err = gpio_request(nGPIOs[0], "lcd-backlight-en"))) {
-		printk(KERN_ERR "failed to request GPH1[6] for lcd control\n");
-		return err;
-	}
-
-	if ((err = gpio_request(nGPIOs[1], "lcd-backlight-en"))) {
-		printk(KERN_ERR "failed to request GPH1[7] for lcd control\n");
-        gpio_free(nGPIOs[0]);
-		return err;
-	}
-
-    if (onoff) {
-        gpio_direction_output(nGPIOs[0], 1);
-        gpio_direction_output(nGPIOs[1], 0);
-    } else {
-        gpio_direction_output(nGPIOs[0], 0);
-        gpio_direction_output(nGPIOs[1], 1);
-    }
-
-	mdelay(20);
-    gpio_free(nGPIOs[1]);
-    gpio_free(nGPIOs[0]);
-
-	return 0;
-}
-
-static int lte480wv_backlight_on(struct platform_device *pdev)
-{
-    return lte480wv_backlight_onoff(pdev, 1);
-}
-
-static int lte480wv_backlight_off(struct platform_device *pdev)
-{
-    return lte480wv_backlight_onoff(pdev, 0);
-}
-
-static int lte480wv_lcd_on(struct platform_device *pdev)
-{
-	return lte480wv_lcd_onoff(pdev, 1);
-}
-
-static int lte480wv_lcd_off(struct platform_device *pdev)
-{
-	return lte480wv_lcd_onoff(pdev, 0);
-}
-
-static int lte480wv_reset_lcd(struct platform_device *pdev)
-{
-    lte480wv_lcd_on(pdev);
-	mdelay(200);
-    lte480wv_lcd_off(pdev);
-    lte480wv_lcd_on(pdev);
-	return 0;
-}
-
-static struct s3c_platform_fb lte480wv_fb_data __initdata = {
+static struct s3c_platform_fb utv210_fb_data __initdata = {
 	.hw_ver	= 0x62,
 	.nr_wins = 5,
 	.default_win = CONFIG_FB_S3C_DEFAULT_WINDOW,
 	.swap = FB_SWAP_WORD | FB_SWAP_HWORD,
 
-	.lcd                = &lte480wv,
-	.cfg_gpio	        = lte480wv_cfg_gpio,
-	.backlight_on	    = lte480wv_backlight_on,
-	.backlight_off      = lte480wv_backlight_off,
-    .lcd_on             = lte480wv_lcd_on,
-    .lcd_off            = lte480wv_lcd_off,
-	.reset_lcd	        = lte480wv_reset_lcd,
+	.lcd                = &lcd_ut7gm,
+	.cfg_gpio	        = s3cfb_cfg_gpio,
+	.backlight_on	    = s3cfb_backlight_on,
+	.backlight_off      = s3cfb_backlight_off,
+    .lcd_on             = s3cfb_lcd_on,
+    .lcd_off            = s3cfb_lcd_off,
+	.reset_lcd	        = s3cfb_reset_lcd,
 };
-#endif
 
 #ifdef CONFIG_S3C64XX_DEV_SPI
 
@@ -1583,9 +1486,7 @@ static void __init smdkc110_machine_init(void)
 	smdkc110_dm9000_set();
 #endif
 
-#ifdef CONFIG_FB_S3C_LTE480WV
-	s3cfb_set_platdata(&lte480wv_fb_data);
-#endif
+	s3cfb_set_platdata(&utv210_fb_data);
 
 	/* spi */
 #ifdef CONFIG_S3C64XX_DEV_SPI
@@ -1664,12 +1565,10 @@ static void __init smdkc110_machine_init(void)
 #ifdef CONFIG_BACKLIGHT_PWM
 	smdk_backlight_register();
 
-#ifdef CONFIG_FB_S3C_LTE480WV
     // Turn off the LCD and backlight. This prevents the unnecessary
     // flickering and the display changing.
-    lte480wv_backlight_onoff(NULL, 0);
-    lte480wv_lcd_onoff(NULL, 0);
-#endif
+    s3cfb_backlight_off(NULL);
+    s3cfb_lcd_off(NULL);
 #endif
 
 	regulator_has_full_constraints();

@@ -73,23 +73,6 @@ config VIDEO_SAMSUNG_MEMSIZE_FIMD
 	depends on FB_S3C
 	default "3072"
 
-choice
-depends on FB_S3C
-prompt "Select LCD Type"
-default FB_S3C_LTE480WV
-config FB_S3C_LTE480WV
-	bool "LTE480WV"
-	depends on (MACH_SMDKV210 || MACH_SMDKC110  || MACH_T34)
-	---help---
-	  This enables support for Samsung LTE480WV 4.8\" WVGA LCD panel
-
-config FB_S3C_HT101HD1
-	bool "HT101HD1"
-	depends on MACH_SMDKV210
-	---help---
-	  This enables support for HT101HD1 WXVGA(1366*768) LCD panel
-endchoice
-
 config FB_S3C_TL2796
         bool "TL2796"
         depends on FB_S3C

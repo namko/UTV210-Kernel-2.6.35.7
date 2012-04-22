@@ -120,7 +120,6 @@ void s3cfb_get_clk_name(char *clk_name)
 	strcpy(clk_name, "sclk_fimd");
 }
 
-#ifdef CONFIG_FB_S3C_LTE480WV
 void s3cfb_lateresume_cfg_gpio(struct platform_device *pdev)
 {
 	int i;
@@ -162,176 +161,87 @@ void s3cfb_earlysuspend_cfg_gpio(struct platform_device *pdev)
 
 int s3cfb_backlight_onoff(struct platform_device *pdev, int onoff)
 {
-	int err;
-	err = gpio_request(S5PV210_GPD0(0), "GPD0");
+    int err;
+
+    // mg3100: GPH2[4] LCD backlight
+    unsigned int nGPIO = S5PV210_GPH2(4);
+	err = gpio_request(nGPIO, "backlight-en");
 
 	if (err) {
-		printk(KERN_ERR "failed to request GPD0 for "
-			"lcd backlight control\n");
+		printk(KERN_ERR "failed to request GPH2[4] for backlight control\n");
 		return err;
 	}
 
-	if (onoff) {
-		gpio_direction_output(S5PV210_GPD0(0), 1);
-		/* 2009.12.28 by icarus : added for PWM backlight */
-		s3c_gpio_cfgpin(S5PV210_GPD0(0), S5PV210_GPD_0_0_TOUT_0);
+    if (onoff)
+        gpio_direction_output(nGPIO, 1);
+    else
+        gpio_direction_output(nGPIO, 0);
 
+	mdelay(10);
+    gpio_free(nGPIO);
+
+	return 0;
+}
+
+static int s3cfb_lcd_onoff(struct platform_device *pdev, int onoff)
+{
+    int err;
+
+    // namko: Use GPH1[6] and GPH1[7] to control LCD power (including backlight)
+    unsigned int nGPIOs[] = {S5PV210_GPH1(6), S5PV210_GPH1(7)};
+
+	if ((err = gpio_request(nGPIOs[0], "lcd-backlight-en"))) {
+		printk(KERN_ERR "failed to request GPH1[6] for lcd control\n");
+		return err;
 	}
-	else {
-		gpio_direction_output(S5PV210_GPD0(0), 0);
+
+	if ((err = gpio_request(nGPIOs[1], "lcd-backlight-en"))) {
+		printk(KERN_ERR "failed to request GPH1[7] for lcd control\n");
+        gpio_free(nGPIOs[0]);
+		return err;
 	}
-	gpio_free(S5PV210_GPD0(0));
+
+    if (onoff) {
+        gpio_direction_output(nGPIOs[0], 1);
+        gpio_direction_output(nGPIOs[1], 0);
+    } else {
+        gpio_direction_output(nGPIOs[0], 0);
+        gpio_direction_output(nGPIOs[1], 1);
+    }
+
+	mdelay(20);
+    gpio_free(nGPIOs[1]);
+    gpio_free(nGPIOs[0]);
+
 	return 0;
 }
 
 int s3cfb_backlight_on(struct platform_device *pdev)
 {
-	int err;
-	err = gpio_request(S5PV210_GPD0(0), "GPD0");
-
-	if (err) {
-		printk(KERN_ERR "failed to request GPD0 for "
-			"lcd backlight control\n");
-		return err;
-	}
-
-	gpio_direction_output(S5PV210_GPD0(0), 1);
-
-	s3c_gpio_cfgpin(S5PV210_GPD0(0), S5PV210_GPD_0_0_TOUT_0);
-
-	gpio_free(S5PV210_GPD0(0));
-	return 0;
+    return s3cfb_backlight_onoff(pdev, 1);
 }
 
 int s3cfb_backlight_off(struct platform_device *pdev)
 {
-	int err;
-
-	err = gpio_request(S5PV210_GPD0(0), "GPD0");
-
-	if (err) {
-		printk(KERN_ERR "failed to request GPD0 for "
-				"lcd backlight control\n");
-		return err;
-	}
-
-	gpio_direction_output(S5PV210_GPD0(0), 0);
-	gpio_free(S5PV210_GPD0(0));
-	return 0;
+    return s3cfb_backlight_onoff(pdev, 0);
 }
 
 int s3cfb_lcd_on(struct platform_device *pdev)
 {
-	int err;
-	err = gpio_request(S5PV210_GPF0(2), "GPF0");
-	if (err)
-	    printk(KERN_ERR "#### failed to request GPF0-2 for ");
-	s3c_gpio_setpull(S5PV210_GPF0(2), S3C_GPIO_PULL_NONE);
-	gpio_direction_output(S5PV210_GPF0(2), 1);
-	gpio_free(S5PV210_GPF0(2));
-
-
-	err = gpio_request(S5PV210_GPD0(2), "GPD0");
-	if (err)
-	    printk(KERN_ERR "#### failed to request GPD0-2 for ");
-	s3c_gpio_setpull(S5PV210_GPD0(2), S3C_GPIO_PULL_NONE);
-	gpio_direction_output(S5PV210_GPD0(2), 1);
-	gpio_free(S5PV210_GPD0(2));
-
-	err = gpio_request(S5PV210_GPD0(1), "GPD0");
-	if (err)
-	    printk(KERN_ERR "#### failed to request GPD0-1 for ");
-	s3c_gpio_setpull(S5PV210_GPD0(1), S3C_GPIO_PULL_NONE);
-	gpio_direction_output(S5PV210_GPD0(1), 1);
-	gpio_free(S5PV210_GPD0(1));
-
-	return 0;
+	return s3cfb_lcd_onoff(pdev, 1);
 }
 
 int s3cfb_lcd_off(struct platform_device *pdev)
 {
-	int err;
-	printk("s3cfb_lcd_off\n");
-	//return 0;
-	
-	err = gpio_request(S5PV210_GPD0(1), "GPD0");
-	if (err)
-	    printk(KERN_ERR "#### failed to request GPD0-1 for ");
-	s3c_gpio_setpull(S5PV210_GPD0(1), S3C_GPIO_PULL_NONE);
-	gpio_direction_output(S5PV210_GPD0(1), 0);
-	gpio_free(S5PV210_GPD0(1));
-
-	err = gpio_request(S5PV210_GPD0(2), "GPD0");
-	if (err)
-	    printk(KERN_ERR "#### failed to request GPD0-2 for ");
-	s3c_gpio_setpull(S5PV210_GPD0(2), S3C_GPIO_PULL_NONE);
-	gpio_direction_output(S5PV210_GPD0(2), 0);
-	gpio_free(S5PV210_GPD0(2));
-
-	err = gpio_request(S5PV210_GPF0(2), "GPF0");
-	if (err)
-	    printk(KERN_ERR "#### failed to request GPF0-2 for ");
-	s3c_gpio_setpull(S5PV210_GPF0(2), S3C_GPIO_PULL_NONE);
-	gpio_direction_output(S5PV210_GPF0(2), 0);
-	gpio_free(S5PV210_GPF0(2));
-	return 0;
-}
-#elif defined(CONFIG_FB_S3C_HT101HD1)
-int s3cfb_backlight_on(struct platform_device *pdev)
-{
-	int err;
-
-	err = gpio_request(S5PV210_GPB(2), "GPB");
-	if (err) {
-		printk(KERN_ERR "failed to request GPB for "
-			"lcd backlight control\n");
-		return err;
-	}
-
-#ifdef CONFIG_TYPE_PROTO3
-	err = gpio_request(S5PV210_GPD0(1), "GPD0");
-	if (err) {
-		printk(KERN_ERR "failed to request GPD0 for "
-			"lcd backlight control\n");
-		return err;
-	}
-#endif
-
-	gpio_direction_output(S5PV210_GPB(2), 1); /* LED_EN (SPI1_MOSI) */
-
-#ifdef CONFIG_TYPE_PROTO3
-	/* LCD_PWR_EN is only for Proto3 */
-	gpio_direction_output(S5PV210_GPD0(1), 1);
-	mdelay(10);
-#endif
-
-	gpio_free(S5PV210_GPB(2));
-#ifdef CONFIG_TYPE_PROTO3
-	gpio_free(S5PV210_GPD0(1));
-#endif
-
-	return 0;
+	return s3cfb_lcd_onoff(pdev, 0);
 }
 
 int s3cfb_reset_lcd(struct platform_device *pdev)
 {
-	int err;
-
-	err = gpio_request(S5PV210_GPH0(1), "GPH0");
-	if (err) {
-		printk(KERN_ERR "failed to request GPH0 for "
-			"lcd reset control\n");
-		return err;
-	}
-
-	gpio_direction_output(S5PV210_GPH0(1), 1);
-
-	gpio_set_value(S5PV210_GPH0(1), 0);
-
-	gpio_set_value(S5PV210_GPH0(1), 1);
-
-	gpio_free(S5PV210_GPH0(1));
-
+    s3cfb_lcd_on(pdev);
+	mdelay(200);
+    s3cfb_lcd_off(pdev);
+    s3cfb_lcd_on(pdev);
 	return 0;
 }
-#endif
+
