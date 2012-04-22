@@ -100,6 +100,8 @@
 #include <plat/regs-otg.h>
 #include <../../../drivers/video/samsung/s3cfb.h>
 
+#include <mach/utv210-cfg.h>
+
 /* Following are default values for UCON, ULCON and UFCON UART registers */
 #define S5PV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
 				 S3C2410_UCON_RXILEVEL |	\
@@ -1553,6 +1555,8 @@ static void smdkc110_pm_restart(char mode, const char *cmd)
 static void __init smdkc110_machine_init(void)
 {
 	arm_pm_restart = smdkc110_pm_restart;
+
+    utv210_init_cfg();
 
 	s3c_usb_set_serial();
 	platform_add_devices(smdkc110_devices, ARRAY_SIZE(smdkc110_devices));
