@@ -37,119 +37,45 @@ static const char *part_probes[] = { "cmdlinepart", NULL };
 #endif
 
 #if defined(CONFIG_ARCH_S5PV210)
-#if 0// modify by urbetter
 struct mtd_partition s3c_partition_info[] = {
 	{
 		.name		= "misc",
-		.offset		= (768*SZ_1K),          /* for bootloader */
-		.size		= (256*SZ_1K),
-		.mask_flags	= MTD_CAP_NANDFLASH,
-	},
-	{
-		.name		= "recovery",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= (5*SZ_1M),
-		//.mask_flags	= MTD_CAP_NANDFLASH,
-	},
-	{
-		.name		= "kernel",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= (5*SZ_1M),
-	},
-	{
-		.name		= "ramdisk",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= (3*SZ_1M),
-	},
-	{
-		.name		= "system",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= (90*SZ_1M),
-	},
-	{
-		.name		= "cache",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= (80*SZ_1M),
-	},
-	{
-		.name		= "userdata",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= MTDPART_SIZ_FULL,
-	}
-};
-
-/*
-struct mtd_partition s3c_partition_info[] = {
-	{
-		.name		= "misc",
-		.offset		= (768*SZ_1K),          /* for bootloader */
-		.size		= (256*SZ_1K),
-		.mask_flags	= MTD_CAP_NANDFLASH,
-	},
-	{
-		.name		= "recovery",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= (5*SZ_1M),
-	},
-	{
-		.name		= "kernel",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= (5*SZ_1M),
-	},
-	{
-		.name		= "ramdisk",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= (3*SZ_1M),
-	},
-	{
-		.name		= "system",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= (110*SZ_1M),
-	},
-	{
-		.name		= "cache",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= (80*SZ_1M),
-	},
-	{
-		.name		= "userdata",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= MTDPART_SIZ_FULL,
-	}
-};
-*/
-#else
-struct mtd_partition s3c_partition_info[] = {
-	//urbetter: current partitions map
-	{
-		.name		= "misc",
-		.offset		= (512*SZ_1K),         //for bootloader params, be careful.
+		.offset		= (512*SZ_1K),
 		.size		= (512*SZ_1K),
 		.mask_flags	= MTD_CAP_NANDFLASH,
 	},
 	{
 		.name		= "recovery",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= (5*SZ_1M),
+		.offset		= (1*SZ_1M),
+		.size		= (8*SZ_1M),
 	},
 	{
 		.name		= "kernel",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= (5*SZ_1M),
+		.offset		= (9*SZ_1M),
+		.size		= (6*SZ_1M),
 	},
 	{
 		.name		= "logo",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= (3*SZ_1M),
+		.offset		= (15*SZ_1M),
+		.size		= (4*SZ_1M),
 	},
 	{
 		.name		= "rootfs",
-		.offset		= MTDPART_OFS_APPEND,
+		.offset		= (21*SZ_1M),
 		.size		= MTDPART_SIZ_FULL,
 	},
+	{
+		.name		= "param",
+		.offset		= (19*SZ_1M),
+		.size		= (2*SZ_1M),
+	},
+	{
+		.name		= "bootloader",
+		.offset		= 0,
+		.size		= (512*SZ_1K),
+		.mask_flags	= MTD_CAP_NANDFLASH,
+	},
 };
-#endif
-
 
 struct s3c_nand_mtd_info s3c_nand_mtd_part_info = {
 	.chip_nr = 1,
