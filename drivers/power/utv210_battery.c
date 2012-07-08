@@ -29,27 +29,17 @@
 
 #define DRIVER_NAME             "utv210-battery"
 #define DRIVER_ADC_CHANNEL      0
-#define POLL_INTERVAL_IN_SECS   3
-#define NUMBER_OF_SAMPLES       10
+#define POLL_INTERVAL_IN_SECS   10
+#define NUMBER_OF_SAMPLES       16
 
 // namko: To prevent rapidly-varying/spurious battery percentages the
 // ADC's value should be integrated over an interval of time. Currently
 // this is set to a minute and appears to provide reasonable data.
-#define POLL_INTERVAL_IN_SECS   3
-#define NUMBER_OF_VALUES_AVG    20
+#define NUMBER_OF_VALUES_AVG    25
 
 // NOTE battery-full is valid only when AC is connected!
 static const int nGPIO_AC_Connected = S5PV210_GPH3(6);
 static const int nGPIO_Battery_Full = S5PV210_GPH0(2);
-
-// namko: Experiments reveal that maximum value of ADCIN0 is about 3300
-// for full battery and reduces by approximately 6 for every percent.
-static const int ADC_MAX_MV = 3300, ADC_MIN_MV = 2600;
-
-// mg3100: The battery is made of 2 separate batteries wired in series.
-// The standard voltage for 1 cell is 3.6(empty) to 4.2 or 4.3 (Li-Ion or Li-Poly)
-// that makes 7.2(empty) and 8.4 or 8.6(full) for 2 cells.
-static const int BATTERY_MAX_MV = 8500, BATTERY_MIN_MV = 7200;
 
 static struct wake_lock vbus_wake_lock;
 static struct device *dev;
@@ -101,37 +91,76 @@ static DEFINE_MUTEX(work_lock);
 static struct battery_info utv210_bat_info;
 
 static int utv210_get_bat_temp(struct power_supply *bat_ps) {
-    // namko: HACK: Fixed, this is.
-    int temp = 200;
-    return temp;
+    return utv210_bat_info.batt_temp_adc + 
+        utv210_bat_info.batt_temp_adc_cal;
 }
 
 static u32 utv210_get_bat_health(void) {
-    // namko: HACK: Fixed, this is, too.
     return utv210_bat_info.batt_health;
 }
 
-// "utv210_bat_info.vol_adc" must be set before calling this function.
+// "utv210_bat_info.batt_vol" must be set before calling this function.
 static int utv210_get_bat_level(struct power_supply *bat_ps) {
-    // mg3100: Battery is connected to ADCIN0. Max count for ADC is reached
-    // at 3.3 volts. Battery is connected using divider resistors to lower
-    // the voltage to 2.350 volts for an emtpy battery to 2.730 volts for
-    // a completely charged battery.
-    int value = (utv210_bat_info.batt_vol_adc - ADC_MIN_MV) * 
-            100 / (ADC_MAX_MV - ADC_MIN_MV);
+    int i, level;
 
-    if (value < 0)
-        value = 0;
-    else if (value > 100)
-        value = 100;
+    // Read current battery voltage.
+    const int v = utv210_bat_info.batt_vol;
 
-    return value;
+    // The battery capacity table.
+    const struct { int mv; int p; } captable[] = {
+        {6800, 0}, {7150, 4}, {7300, 10}, {7400, 23},
+        {7530, 38}, {7620, 50}, {7720, 65}, {7800, 78},
+        {7870, 86}, {7920, 92}, {8000, 96}, {8150, 100}};
+
+    // Find two suitable levels for interpolation.
+    for (i = 10; v < captable[i].mv && i > 0; i--)
+        ;
+
+    // Interpolate.
+    level = (captable[i + 1].p - captable[i].p) * (v - captable[i].mv) / 
+        (captable[i + 1].mv - captable[i].mv) + captable[i].p;
+
+    if (level < 0)
+        level = 0;
+
+    if (level > 100)
+        level = 100;
+
+    return level;
 }
 
-// "utv210_bat_info.vol_adc" must be set before calling this function.
+// "utv210_bat_info.batt_vol_adc" must be set before calling this function.
 static int utv210_get_bat_vol(struct power_supply *bat_ps) {
-    return BATTERY_MIN_MV + (BATTERY_MAX_MV - BATTERY_MIN_MV) * 
-            (ADC_MAX_MV - ADC_MIN_MV) / (utv210_bat_info.batt_vol_adc - ADC_MIN_MV);
+    int i, level;
+
+    // Get raw adc value, calibrated using the calibration parameter.
+    const int adc = utv210_bat_info.batt_vol_adc + 
+        utv210_bat_info.batt_vol_adc_cal;
+
+    // The ADC calibration table.
+    const struct { int adc; int mv; } caltable[] = {
+        {2874, 6800}, {2890, 7042}, {2900, 7133},
+        {2930, 7281}, {2945, 7314}, {2985, 7375},
+        {3000, 7451}, {3010, 7549}, {3015, 7580},
+        {3040, 7647}, {3075, 7708}, {3100, 7740},
+        {3215, 7930}, {3230, 7981}, {3264, 8150}};
+
+    // Find two suitable levels for interpolation.
+    for (i = 13; adc < caltable[i].adc && i > 0; i--)
+        ;
+
+    // Interpolate.
+    level = (caltable[i + 1].mv - caltable[i].mv) * (adc - caltable[i].adc) / 
+        (caltable[i + 1].adc - caltable[i].adc) + caltable[i].mv;
+
+    if (level < 6600)
+        level = 6600;
+
+    if (level > 8500)
+        level = 8500;
+
+    return level;
+
 }
 
 static int utv210_bat_get_charging_status(void) {
@@ -145,12 +174,10 @@ static int utv210_bat_get_charging_status(void) {
         ret = POWER_SUPPLY_STATUS_NOT_CHARGING;
         break;
     case CHARGER_AC:
-        if (utv210_bat_info.level == 100 
-            && utv210_bat_info.batt_is_full) {
+        if (utv210_bat_info.batt_is_full)
             ret = POWER_SUPPLY_STATUS_FULL;
-        } else {
+        else
             ret = POWER_SUPPLY_STATUS_CHARGING;
-        }
         break;
     case CHARGER_DISCHARGE:
         ret = POWER_SUPPLY_STATUS_DISCHARGING;
@@ -180,6 +207,13 @@ static int utv210_bat_get_property(struct power_supply *bat_ps,
         break;
     case POWER_SUPPLY_PROP_TECHNOLOGY:
         val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
+        break;
+    case POWER_SUPPLY_PROP_ONLINE:
+        /* battery is always online */
+        val->intval = 1;
+        break;
+    case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+        val->intval = utv210_bat_info.batt_vol;
         break;
     case POWER_SUPPLY_PROP_CAPACITY:
         val->intval = utv210_bat_info.level;
@@ -248,16 +282,16 @@ enum {
 static int utv210_bat_create_attrs(struct device * dev) {
     int i, rc;
 
-    for (i = 0; i < ARRAY_SIZE(utv210_battery_attrs); i++) {
-        rc = device_create_file(dev, &utv210_battery_attrs[i]);
-        if (rc)
-        goto attrs_failed;
-    }
+    for (i = 0; i < ARRAY_SIZE(utv210_battery_attrs); i++)
+        if ((rc = device_create_file(dev, &utv210_battery_attrs[i])))
+            goto attrs_failed;
+
     goto succeed;
 
 attrs_failed:
     while (i--)
-    device_remove_file(dev, &utv210_battery_attrs[i]);
+        device_remove_file(dev, &utv210_battery_attrs[i]);
+
 succeed:
     return rc;
 }
@@ -334,7 +368,10 @@ static enum power_supply_property utv210_battery_properties[] = {
     POWER_SUPPLY_PROP_HEALTH,
     POWER_SUPPLY_PROP_PRESENT,
     POWER_SUPPLY_PROP_TECHNOLOGY,
+    POWER_SUPPLY_PROP_ONLINE,
+    POWER_SUPPLY_PROP_VOLTAGE_NOW,
     POWER_SUPPLY_PROP_CAPACITY,
+    POWER_SUPPLY_PROP_TEMP,
 };
 
 static enum power_supply_property utv210_power_properties[] = {
@@ -411,12 +448,12 @@ static void utv210_bat_status_update(struct power_supply *bat_ps) {
     mutex_lock(&work_lock);
 
     old_temp = utv210_bat_info.batt_temp;
-    old_level = utv210_bat_info.level; 
+    old_level = utv210_bat_info.level;
     old_is_full = utv210_bat_info.batt_is_full;
 
     utv210_bat_info.batt_temp = utv210_get_bat_temp(bat_ps);
-    utv210_bat_info.level = utv210_get_bat_level(bat_ps);
     utv210_bat_info.batt_vol = utv210_get_bat_vol(bat_ps);
+    utv210_bat_info.level = utv210_get_bat_level(bat_ps);
 
     if (old_level != utv210_bat_info.level ||
             old_temp != utv210_bat_info.batt_temp ||
@@ -469,10 +506,12 @@ static void battery_watcher(struct work_struct *work) {
     for (i = 0, sum = 0; i < NUMBER_OF_SAMPLES; i++) {
         readings[i] = s3c_adc_get_adc_data(DRIVER_ADC_CHANNEL);
         sum += readings[i];
+        udelay(25);
 
         if (i) {
             if (readings[i] < min)
                 min = readings[i];
+
             if (readings[i] > max)
                 max = readings[i];
         } else {
@@ -497,7 +536,9 @@ static void battery_watcher(struct work_struct *work) {
 
     // full-battery GPIO is only valid if AC is connected.
     if (ac_connected && battery_full)
-        utv210_bat_info.batt_vol_adc = ADC_MAX_MV;
+        utv210_bat_info.batt_is_full = 1;
+    else
+        utv210_bat_info.batt_is_full = 0;
 
     // Update cable and battery status(es).
     utv210_bat_status_update(&utv210_power_supplies[CHARGER_BATTERY]);
@@ -518,7 +559,7 @@ static int __devinit utv210_bat_probe(struct platform_device *pdev) {
     utv210_bat_info.batt_vol_adc_cal = 0;
     utv210_bat_info.batt_temp = 0;
     utv210_bat_info.batt_temp_adc = 0;
-    utv210_bat_info.batt_temp_adc_cal = 0;
+    utv210_bat_info.batt_temp_adc_cal = 200;
     utv210_bat_info.batt_current = 0;
     utv210_bat_info.level = 0;
     utv210_bat_info.charging_source = CHARGER_BATTERY;
