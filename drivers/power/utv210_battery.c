@@ -26,6 +26,7 @@
 #include <asm/mach-types.h>
 #include <mach/hardware.h>
 #include <plat/gpio-cfg.h>
+#include <mach/utv210-cfg.h>
 
 #define DRIVER_NAME             "utv210-battery"
 #define DRIVER_ADC_CHANNEL      0
@@ -99,21 +100,60 @@ static u32 utv210_get_bat_health(void) {
     return utv210_bat_info.batt_health;
 }
 
+struct capacity_entry {
+    int mv;
+    int p;
+};
+
+static const struct capacity_entry captable_7024[] = {
+    {6700, 0}, {6900, 2}, {7120, 6}, {7260, 16},
+    {7320, 28}, {7420, 44}, {7500, 53}, {7580, 63},
+    {7700, 72}, {7780, 80}, {7880, 92}, {7980, 100}
+};
+
+static const struct capacity_entry captable_703[] = {
+    {6800, 0}, {7150, 4}, {7300, 10}, {7400, 23},
+    {7530, 38}, {7620, 50}, {7720, 65}, {7800, 78},
+    {7870, 86}, {7920, 92}, {8000, 96}, {8150, 100}
+};
+
+static const struct capacity_entry captable_712[] = {
+    {6800, 0}, {6900, 2}, {7120, 6}, {7220, 11},
+    {7320, 20}, {7350, 28}, {7450, 46}, {7500, 56},
+    {7580, 65}, {7700, 74}, {7800, 82}, {7900, 90},
+    {8000, 100}
+};
+
+static const struct capacity_entry captable_generic[] = {
+    {6700, 0}, {6900, 2}, {7120, 6}, {7260, 16},
+    {7320, 28}, {7420, 44}, {7500, 53}, {7580, 63},
+    {7700, 72}, {7780, 80}, {7880, 92}, {7980, 100}
+};
+
 // "utv210_bat_info.batt_vol" must be set before calling this function.
 static int utv210_get_bat_level(struct power_supply *bat_ps) {
-    int i, level;
+    int i, captable_start, level;
+    const struct capacity_entry *captable;
 
     // Read current battery voltage.
     const int v = utv210_bat_info.batt_vol;
 
-    // The battery capacity table.
-    const struct { int mv; int p; } captable[] = {
-        {6800, 0}, {7150, 4}, {7300, 10}, {7400, 23},
-        {7530, 38}, {7620, 50}, {7720, 65}, {7800, 78},
-        {7870, 86}, {7920, 92}, {8000, 96}, {8150, 100}};
+    // Decide on the battery capacity table.
+    if (!strcmp(g_Model, "7024"))
+        captable = captable_7024;
+    else if (!strcmp(g_Model, "703"))
+        captable = captable_703;
+    else if (!strcmp(g_Model, "712"))
+        captable = captable_712;
+    else
+        captable = captable_generic;
+
+    // Find the capacity table size.
+    for (captable_start = 0; captable[captable_start + 1].p < 100; captable_start++)
+        ;
 
     // Find two suitable levels for interpolation.
-    for (i = 10; v < captable[i].mv && i > 0; i--)
+    for (i = captable_start; v < captable[i].mv && i > 0; i--)
         ;
 
     // Interpolate.
