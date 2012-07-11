@@ -1069,7 +1069,10 @@ int fimc_reqbufs_capture(void *fh, struct v4l2_requestbuffers *b)
 		size[0] = cap->fmt.width * cap->fmt.height;
 		size[1] = cap->fmt.width * cap->fmt.height >> 2;
 		size[2] = cap->fmt.width * cap->fmt.height >> 2;
-		size[3] = 16; /* Padding buffer */
+
+        // namko: Disable this padding because it causes a wierd sliding effect during
+        // camera preview. (Other than that, no known issues with this padding.) 
+		//size[3] = 16; /* Padding buffer */
 		fimc_dbg("######%s: V4L2_PIX_FMT_YUV420 size=%d\n", __func__,size[0] );
 		break;
 
