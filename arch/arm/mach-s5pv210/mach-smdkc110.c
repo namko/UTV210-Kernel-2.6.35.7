@@ -73,16 +73,6 @@
 #include <mach/power-domain.h>
 #endif
 
-#ifdef CONFIG_VIDEO_S5K4BA
-#include <media/s5k4ba_platform.h>
-#undef	CAM_ITU_CH_A
-#define	CAM_ITU_CH_B
-#endif
-
-#ifdef CONFIG_VIDEO_S5K4EA
-#include <media/s5k4ea_platform.h>
-#endif
-
 #include <plat/regs-serial.h>
 #include <plat/s5pv210.h>
 #include <plat/devs.h>
@@ -923,281 +913,26 @@ static struct s3c_adc_mach_info s3c_adc_platform __initdata = {
 };
 #endif
 
-/*
- * External camera reset
- * Because the most of cameras take i2c bus signal, so that
- * you have to reset at the boot time for other i2c slave devices.
- * This function also called at fimc_init_camera()
- * Do optimization for cameras on your platform.
-*/
-#ifdef CAM_ITU_CH_A
-static int smdkv210_cam0_power(int onoff)
-{
-	int err;
-	/* Camera A */
-	err = gpio_request(GPIO_PS_VOUT, "GPH0");
-	if (err)
-		printk(KERN_ERR "failed to request GPH0 for CAM_2V8\n");
-
-	s3c_gpio_setpull(GPIO_PS_VOUT, S3C_GPIO_PULL_NONE);
-	gpio_direction_output(GPIO_PS_VOUT, 0);
-	gpio_direction_output(GPIO_PS_VOUT, 1);
-	gpio_free(GPIO_PS_VOUT);
-
-	return 0;
-}
-#else
-static int smdkv210_cam1_power(int onoff)
-{
-	int err;
-
-	/* S/W workaround for the SMDK_CAM4_type board
-	 * When SMDK_CAM4 type module is initialized at power reset,
-	 * it needs the cam_mclk.
-	 *
-	 * Now cam_mclk is set as below, need only set the gpio mux.
-	 * CAM_SRC1 = 0x0006000, CLK_DIV1 = 0x00070400.
-	 * cam_mclk source is SCLKMPLL, and divider value is 8.
-	*/
-
-	/* gpio mux select the cam_mclk */
-	err = gpio_request(GPIO_PS_ON, "GPJ1");
-	if (err)
-		printk(KERN_ERR "failed to request GPJ1 for CAM_2V8\n");
-
-	s3c_gpio_setpull(GPIO_PS_ON, S3C_GPIO_PULL_NONE);
-	s3c_gpio_cfgpin(GPIO_PS_ON, (0x3<<16));
-
-
-	/* Camera B */
-	err = gpio_request(GPIO_BUCK_1_EN_A, "GPH0");
-	if (err)
-		printk(KERN_ERR "failed to request GPH0 for CAM_2V8\n");
-
-	s3c_gpio_setpull(GPIO_BUCK_1_EN_A, S3C_GPIO_PULL_NONE);
-	gpio_direction_output(GPIO_BUCK_1_EN_A, 0);
-	gpio_direction_output(GPIO_BUCK_1_EN_A, 1);
-
-	udelay(1000);
-
-	gpio_free(GPIO_PS_ON);
-	gpio_free(GPIO_BUCK_1_EN_A);
-
-	return 0;
-}
-#endif
-static int s5k5ba_power_en(int onoff)
-{
-	if (onoff) {
-#ifdef CAM_ITU_CH_A
-		smdkv210_cam0_power(onoff);
-#else
-		smdkv210_cam1_power(onoff);
-#endif
-	} else {
-#ifdef CAM_ITU_CH_A
-		smdkv210_cam0_power(onoff);
-#else
-		smdkv210_cam1_power(onoff);
-#endif
-	}
-
-	return 0;
-}
-
-#ifdef CONFIG_VIDEO_S5K4EA
-/* Set for MIPI-CSI Camera module Power Enable */
-static int smdkv210_mipi_cam_pwr_en(int enabled)
-{
-	int err;
-
-	err = gpio_request(S5PV210_GPH1(2), "GPH1");
-	if (err)
-		printk(KERN_ERR "#### failed to request(GPH1)for CAM_2V8\n");
-
-	s3c_gpio_setpull(S5PV210_GPH1(2), S3C_GPIO_PULL_NONE);
-	gpio_direction_output(S5PV210_GPH1(2), enabled);
-	gpio_free(S5PV210_GPH1(2));
-
-	return 0;
-}
-
-/* Set for MIPI-CSI Camera module Reset */
-static int smdkv210_mipi_cam_rstn(int enabled)
-{
-	int err;
-
-	err = gpio_request(S5PV210_GPH0(3), "GPH0");
-	if (err)
-		printk(KERN_ERR "#### failed to reset(GPH0) for MIPI CAM\n");
-
-	s3c_gpio_setpull(S5PV210_GPH0(3), S3C_GPIO_PULL_NONE);
-	gpio_direction_output(S5PV210_GPH0(3), enabled);
-	gpio_free(S5PV210_GPH0(3));
-
-	return 0;
-}
-
-/* MIPI-CSI Camera module Power up/down sequence */
-static int smdkv210_mipi_cam_power(int on)
-{
-	if (on) {
-		smdkv210_mipi_cam_pwr_en(1);
-		mdelay(5);
-		smdkv210_mipi_cam_rstn(1);
-	} else {
-		smdkv210_mipi_cam_rstn(0);
-		mdelay(5);
-		smdkv210_mipi_cam_pwr_en(0);
-	}
-	return 0;
-}
-#endif
-
-#ifdef CONFIG_VIDEO_S5K4BA
-static struct s5k4ba_platform_data s5k4ba_plat = {
-	.default_width = 800,
-	.default_height = 600,
-	.pixelformat = V4L2_PIX_FMT_UYVY,
-	.freq = 44000000,
-	.is_mipi = 0,
-};
-
-static struct i2c_board_info  s5k4ba_i2c_info = {
-	I2C_BOARD_INFO("S5K4BA", 0x2d),
-	.platform_data = &s5k4ba_plat,
-};
-
-static struct s3c_platform_camera s5k4ba = {
-	#ifdef CAM_ITU_CH_A
-	.id		= CAMERA_PAR_A,
-	#else
-	.id		= CAMERA_PAR_B,
-	#endif
-	.type		= CAM_TYPE_ITU,
-	.fmt		= ITU_601_YCBCR422_8BIT,
-	.order422	= CAM_ORDER422_8BIT_CBYCRY,
-	.i2c_busnum	= 0,
-	.info		= &s5k4ba_i2c_info,
-	.pixelformat	= V4L2_PIX_FMT_UYVY,
-	.srclk_name	= "mout_mpll",
-	/* .srclk_name	= "xusbxti", */
-	.clk_name	= "sclk_cam1",
-	.clk_rate	= 44000000,
-	.line_length	= 1920,
-	.width		= 800,
-	.height		= 600,
-	.window		= {
-		.left	= 0,
-		.top	= 0,
-		.width	= 800,
-		.height	= 600,
-	},
-
-	/* Polarity */
-	.inv_pclk	= 0,
-	.inv_vsync	= 1,
-	.inv_href	= 0,
-	.inv_hsync	= 0,
-
-	.initialized	= 0,
-	.cam_power	= s5k5ba_power_en,
-};
-#endif
-
-/* 2 MIPI Cameras */
-#ifdef CONFIG_VIDEO_S5K4EA
-static struct s5k4ea_platform_data s5k4ea_plat = {
-	.default_width = 1920,
-	.default_height = 1080,
-	.pixelformat = V4L2_PIX_FMT_UYVY,
-	.freq = 24000000,
-	.is_mipi = 1,
-};
-
-static struct i2c_board_info  s5k4ea_i2c_info = {
-	I2C_BOARD_INFO("S5K4EA", 0x2d),
-	.platform_data = &s5k4ea_plat,
-};
-
-static struct s3c_platform_camera s5k4ea = {
-	.id		= CAMERA_CSI_C,
-	.type		= CAM_TYPE_MIPI,
-	.fmt		= MIPI_CSI_YCBCR422_8BIT,
-	.order422	= CAM_ORDER422_8BIT_CBYCRY,
-	.i2c_busnum	= 0,
-	.info		= &s5k4ea_i2c_info,
-	.pixelformat	= V4L2_PIX_FMT_UYVY,
-	.srclk_name	= "mout_mpll",
-	.clk_name	= "sclk_cam0",
-	/* .clk_name	= "sclk_cam1", */
-	.clk_rate	= 48000000,
-	.line_length	= 1920,
-	.width		= 1920,
-	.height		= 1080,
-	.window		= {
-		.left	= 0,
-		.top	= 0,
-		.width	= 1920,
-		.height	= 1080,
-	},
-
-	.mipi_lanes	= 2,
-	.mipi_settle	= 12,
-	.mipi_align	= 32,
-
-	/* Polarity */
-	.inv_pclk	= 0,
-	.inv_vsync	= 1,
-	.inv_href	= 0,
-	.inv_hsync	= 0,
-
-	.initialized	= 0,
-	.cam_power	= smdkv210_mipi_cam_power,
-};
-#endif
-
 /* Interface setting */
 static struct s3c_platform_fimc fimc_plat_lsi = {
-	.srclk_name	= "mout_mpll",
-	.clk_name	= "sclk_fimc",
-	.lclk_name	= "sclk_fimc_lclk",
-	.clk_rate	= 166750000,
-#if defined(CONFIG_VIDEO_S5K4EA)
-	.default_cam	= CAMERA_CSI_C,
-#else
-#ifdef CAM_ITU_CH_A
+	.srclk_name		= "mout_mpll",
+	.clk_name		= "sclk_fimc",
+	.lclk_name		= "sclk_fimc_lclk",
+	.clk_rate		= 166750000,
 	.default_cam	= CAMERA_PAR_A,
-#else
-	.default_cam	= CAMERA_PAR_B,
-#endif
-#endif
-	.camera		= {
-#ifdef CONFIG_VIDEO_S5K4ECGX
-			&s5k4ecgx,
-#endif
-#ifdef CONFIG_VIDEO_S5KA3DFX
-			&s5ka3dfx,
-#endif
-#ifdef CONFIG_VIDEO_S5K4BA
-			&s5k4ba,
-#endif
-#ifdef CONFIG_VIDEO_S5K4EA
-			&s5k4ea,
-#endif
+	.camera = {
 	},
-	.hw_ver		= 0x43,
+	.hw_ver			= 0x43,
 };
 
 #ifdef CONFIG_VIDEO_JPEG_V2
 static struct s3c_platform_jpeg jpeg_plat __initdata = {
-	.max_main_width	= 800,
+	.max_main_width		= 800,
 	.max_main_height	= 480,
 	.max_thumb_width	= 320,
 	.max_thumb_height	= 240,
 };
 #endif
-
 
 /* I2C0 */
 static struct i2c_board_info i2c_devs0[] __initdata = {
