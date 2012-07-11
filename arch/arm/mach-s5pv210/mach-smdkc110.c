@@ -73,6 +73,8 @@
 #include <mach/power-domain.h>
 #endif
 
+#include <media/utvcam_platform.h>
+
 #include <plat/regs-serial.h>
 #include <plat/s5pv210.h>
 #include <plat/devs.h>
@@ -913,6 +915,96 @@ static struct s3c_adc_mach_info s3c_adc_platform __initdata = {
 };
 #endif
 
+static int utvcam_power_en(int onoff)
+{
+    int err;
+    unsigned int nGPIOs[] = {
+        S5PV210_GPJ4(4),
+        S5PV210_GPH2(2),
+        S5PV210_GPE1(4)
+    };
+
+    if ((err = gpio_request(nGPIOs[0], "camera-reset-hi253"))) {
+        printk(KERN_ERR "Failed to request GPHJ4[4] for camera reset (hi253)!\n");
+        return err;
+    }
+
+    if ((err = gpio_request(nGPIOs[1], "camera-en"))) {
+        printk(KERN_ERR "Failed to request GPH2[2] for camera power!\n");
+        gpio_free(nGPIOs[0]);
+        return err;
+    }
+
+    if ((err = gpio_request(nGPIOs[2], "camera-reset"))) {
+        printk(KERN_ERR "Failed to request GPE1[4] for camera reset!\n");
+        gpio_free(nGPIOs[1]);
+        gpio_free(nGPIOs[0]);
+        return err;
+    }
+
+    gpio_direction_output(nGPIOs[0], 0);
+
+    s3c_gpio_setpull(nGPIOs[1], S3C_GPIO_PULL_UP);
+    gpio_direction_output(nGPIOs[1], (onoff ? 0 : 1));
+
+    s3c_gpio_setpull(nGPIOs[2], S3C_GPIO_PULL_UP);
+    gpio_direction_output(nGPIOs[2], 1);
+    msleep(50);
+    gpio_direction_output(nGPIOs[2], 0);
+    msleep(50);
+    gpio_direction_output(nGPIOs[2], 1);
+    msleep(50);
+
+    gpio_free(nGPIOs[2]);
+    gpio_free(nGPIOs[1]);
+    gpio_free(nGPIOs[0]);
+
+    return 0;
+}
+
+static struct utvcam_platform_data cam_hm2055_plat = {
+	.default_width = 640,
+	.default_height = 480,
+	.pixelformat = V4L2_PIX_FMT_YUYV,
+	.freq = 24000000,
+	.is_mipi = 0,
+};
+
+static struct i2c_board_info cam_hm2055_i2c_info = {
+	I2C_BOARD_INFO("hm2055", 0x48 >> 1),
+	.platform_data = &cam_hm2055_plat,
+};
+
+static struct s3c_platform_camera cam_hm2055 = {
+	.id				= CAMERA_PAR_A,
+	.type			= CAM_TYPE_ITU,
+	.fmt			= ITU_601_YCBCR422_8BIT,
+	.order422		= CAM_ORDER422_8BIT_CBYCRY,
+	.pixelformat	= V4L2_PIX_FMT_YUYV,
+	.i2c_busnum		= 1,
+	.info			= &cam_hm2055_i2c_info,
+	.srclk_name		= "mout_mpll",
+	.clk_name		= "sclk_cam1",
+	.clk_rate		= 24000000,
+	.line_length	= 1600,
+	.width			= 640,
+	.height			= 480,
+	.window	= {
+		.left		= 0,
+		.top		= 0,
+		.width		= 640,
+		.height		= 480,
+	},
+
+	.inv_pclk		= 0,
+	.inv_vsync		= 1,
+	.inv_href		= 0,
+	.inv_hsync		= 0,
+
+	.initialized	= 0,
+	.cam_power		= utvcam_power_en,
+};
+
 /* Interface setting */
 static struct s3c_platform_fimc fimc_plat_lsi = {
 	.srclk_name		= "mout_mpll",
@@ -924,6 +1016,16 @@ static struct s3c_platform_fimc fimc_plat_lsi = {
 	},
 	.hw_ver			= 0x43,
 };
+
+static void smdkc110_detect_camera(void) {
+    if (!strcmp(g_Camera, "hm2055")) {
+        // Himax HM2055
+        printk("Selecting 2MP camera...\n");
+        fimc_plat_lsi.camera[0] = &cam_hm2055;
+    } else {
+        printk("*** WARNING: cannot determine camera; camera will not work ***");
+    }
+}
 
 #ifdef CONFIG_VIDEO_JPEG_V2
 static struct s3c_platform_jpeg jpeg_plat __initdata = {
@@ -1273,6 +1375,7 @@ static void __init smdkc110_machine_init(void)
 
     utv210_init_cfg();
     smdkc110_detect_lcd();
+    smdkc110_detect_camera();
 
 	s3c_usb_set_serial();
 	platform_add_devices(smdkc110_devices, ARRAY_SIZE(smdkc110_devices));

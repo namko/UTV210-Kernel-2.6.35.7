@@ -1179,6 +1179,12 @@ config VIDEO_S5K4EA
 	---help---
 	  This driver supports S5K4EA SoC camera module
 
+config VIDEO_HM2055
+	bool "HM2055 Camera Sensor"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This driver supports HM2055 SoC camera module
+
 source "drivers/media/video/samsung/Kconfig"
 
 endif # VIDEO_CAPTURE_DRIVERS

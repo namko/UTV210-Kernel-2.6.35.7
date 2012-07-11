@@ -90,6 +90,8 @@ obj-$(CONFIG_VIDEO_S5KA3DFX) 	+= s5ka3dfx.o
 obj-$(CONFIG_VIDEO_S5K4ECGX) 	+= s5k4ecgx.o
 obj-$(CONFIG_VIDEO_S5K4BA)      += s5k4ba.o
 obj-$(CONFIG_VIDEO_S5K4EA) 	+= s5k4ea.o
+
+obj-$(CONFIG_VIDEO_HM2055) 	+= hm2055.o
 # And now the v4l2 drivers:
 
 obj-$(CONFIG_VIDEO_BT848) += bt8xx/
