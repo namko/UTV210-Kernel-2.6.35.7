@@ -365,58 +365,6 @@ static struct power_supply s3c_power_supplies[] = {
 	},
 };
 
-static int s3c_cable_status_update(int status)
-{
-	int ret = 0;
-	charger_type_t source = CHARGER_BATTERY;
-
-	dev_dbg(dev, "%s\n", __func__);
-
-	if(!s3c_battery_initial)
-		return -EPERM;
-
-	switch(status) {
-	case CHARGER_BATTERY:
-		dev_dbg(dev, "%s : cable NOT PRESENT\n", __func__);
-		s3c_bat_info.bat_info.charging_source = CHARGER_BATTERY;
-		break;
-	case CHARGER_USB:
-		dev_dbg(dev, "%s : cable USB\n", __func__);
-		s3c_bat_info.bat_info.charging_source = CHARGER_USB;
-		break;
-	case CHARGER_AC:
-		dev_dbg(dev, "%s : cable AC\n", __func__);
-		s3c_bat_info.bat_info.charging_source = CHARGER_AC;
-		break;
-	case CHARGER_DISCHARGE:
-		dev_dbg(dev, "%s : Discharge\n", __func__);
-		s3c_bat_info.bat_info.charging_source = CHARGER_DISCHARGE;
-		break;
-	default:
-		dev_err(dev, "%s : Nat supported status\n", __func__);
-		ret = -EINVAL;
-	}
-	source = s3c_bat_info.bat_info.charging_source;
-
-	if (source == CHARGER_USB || source == CHARGER_AC) {
-		wake_lock(&vbus_wake_lock);
-	} else {
-		/* give userspace some time to see the uevent and update
-		 * LED state or whatnot...
-		 */
-		wake_lock_timeout(&vbus_wake_lock, HZ / 2);
-	}
-
-	/* if the power source changes, all power supplies may change state */
-	power_supply_changed(&s3c_power_supplies[CHARGER_BATTERY]);
-	/*
-	power_supply_changed(&s3c_power_supplies[CHARGER_USB]);
-	power_supply_changed(&s3c_power_supplies[CHARGER_AC]);
-	*/
-	dev_dbg(dev, "%s : call power_supply_changed\n", __func__);
-	return ret;
-}
-
 static void s3c_bat_status_update(struct power_supply *bat_ps)
 {
 	int old_level, old_temp, old_is_full;
@@ -445,18 +393,6 @@ static void s3c_bat_status_update(struct power_supply *bat_ps)
 	mutex_unlock(&work_lock);
 	dev_dbg(dev, "%s --\n", __func__);
 }
-
-void s3c_cable_check_status(int flag)
-{
-    charger_type_t status = 0;
-
-    if (flag == 0)  // Battery
-		status = CHARGER_BATTERY;
-    else    // USB
-		status = CHARGER_USB;
-    s3c_cable_status_update(status);
-}
-EXPORT_SYMBOL(s3c_cable_check_status);
 
 #ifdef CONFIG_PM
 static int s3c_bat_suspend(struct platform_device *pdev, 
@@ -557,7 +493,10 @@ static int __init s3c_bat_init(void)
 
 	s3c_bat_init_hw();
 
+    // namko: Get a wake-lock (TEMPORARY work-around until solution
+    // for freeze-on-suspend is found).
 	wake_lock_init(&vbus_wake_lock, WAKE_LOCK_SUSPEND, "vbus_present");
+    wake_lock(&vbus_wake_lock);
 
 	return platform_driver_register(&s3c_bat_driver);
 }
@@ -566,6 +505,9 @@ static void __exit s3c_bat_exit(void)
 {
 	pr_info("%s\n", __func__);
 	platform_driver_unregister(&s3c_bat_driver);
+
+    wake_unlock(&vbus_wake_lock);
+    wake_lock_destroy(&vbus_wake_lock);
 }
 
 module_init(s3c_bat_init);

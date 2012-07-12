@@ -532,7 +532,6 @@ static void __init smdkc110_setup_clocks(void)
 #endif
 }
 
-#if defined(CONFIG_TOUCHSCREEN_S3C)
 static struct s3c_ts_mach_info s3c_ts_platform __initdata = {
 	.delay                  = 10000,
 	.presc                  = 49,
@@ -579,7 +578,6 @@ void __init s3c_ts_set_platdata(struct s3c_ts_mach_info *pd)
 		pr_err("no memory for Touchscreen platform data\n");
 	}
 }
-#endif
 
 #if defined(CONFIG_KEYPAD_S3C) || defined(CONFIG_KEYPAD_S3C_MODULE)
 #if defined(CONFIG_KEYPAD_S3C_MSM)
@@ -1148,11 +1146,6 @@ static struct i2c_board_info i2c_devs1[] __initdata = {
 		I2C_BOARD_INFO("wm8976", 0x1a),
 	},
 #endif
-#ifdef CONFIG_TOUCHSCREEN_FT5406
-	{
-		I2C_BOARD_INFO("ft5x0x_ts", (0x70>>1)),
-	},
-#endif
 #ifdef CONFIG_VIDEO_TV20
 	{
 		I2C_BOARD_INFO("s5p_ddc", (0x74>>1)),
@@ -1163,6 +1156,10 @@ static struct i2c_board_info i2c_devs1[] __initdata = {
 		I2C_BOARD_INFO("mma7660", (0x98>>1)),
 	},
 #endif
+};
+
+static struct i2c_board_info i2c_ft5x0x_ts __initdata = {
+	I2C_BOARD_INFO("ft5x0x_ts", (0x70>>1))
 };
 
 /* I2C2 */
@@ -1197,18 +1194,10 @@ static void smdkc110_power_off(void)
 	while (1);
 }
 
-#if defined(CONFIG_BATTERY_S3C) || defined(CONFIG_BATTERY_UTV210)
 struct platform_device sec_device_battery = {
-#if defined(CONFIG_BATTERY_S3C)
-	.name   = "sec-fake-battery",
-#elif defined(CONFIG_BATTERY_UTV210)
 	.name   = "utv210-battery",
-#else
-#error "ERROR incorrect battery configuration"
-#endif
 	.id = -1,
 };
-#endif
 
 #ifdef CONFIG_ANDROID_PMEM
 static struct android_pmem_platform_data pmem_gpu1_pdata = {
@@ -1271,9 +1260,6 @@ static struct platform_device *smdkc110_devices[] __initdata = {
 #ifdef CONFIG_VIDEO_MFC50
 	&s3c_device_mfc,
 #endif
-#ifdef CONFIG_TOUCHSCREEN_S3C
-	&s3c_device_ts,
-#endif
 	&s3c_device_keypad,
 #ifdef CONFIG_S5P_ADC
 	&s3c_device_adc,
@@ -1328,9 +1314,7 @@ static struct platform_device *smdkc110_devices[] __initdata = {
 	&s3c_device_rndis,
 #endif
 #endif
-#if defined(CONFIG_BATTERY_S3C) || defined(CONFIG_BATTERY_UTV210)
 	&sec_device_battery,
-#endif
 #ifdef CONFIG_S3C_DEV_HSMMC
 	&s3c_device_hsmmc0,
 #endif
@@ -1364,6 +1348,31 @@ static struct platform_device *smdkc110_devices[] __initdata = {
 	&s3c_device_timer[3],
 #endif
 };
+
+static void smdkc110_detect_pdevs(void) {
+    int ret;
+
+    if (!strcmp(g_Model, "703")) {
+        // Herotab C8/Dropad A8/Haipad M7
+        printk("Selecting capacitive touchscreen...\n");
+
+        if ((ret = i2c_register_board_info(1, &i2c_ft5x0x_ts, 1)) != 0)
+            printk("*** ERROR: cannot register capacitive touchscreen (%d); touch will not work ***\n", ret);
+
+    } else if (!strcmp(g_Model, "7024") || !strcmp(g_Model, "8024")) {
+        // Coby 7024 and Coby 8024.
+        printk("Selecting resistive touchscreen...\n");
+
+        if ((ret = platform_device_register(&s3c_device_ts)) != 0)
+            printk("*** ERROR: cannot register resistive touchscreen (%d); touch will not work ***\n", ret);
+
+        // Use S3C fake battery driver until conflict with the touchscreen is resolved.
+        sec_device_battery.name = "sec-fake-battery";
+
+    } else {
+        printk("*** WARNING: unknwon model; some devices will not work ***\n");
+    }
+}
 
 static void __init smdkc110_map_io(void)
 {
@@ -1470,6 +1479,7 @@ static void __init smdkc110_machine_init(void)
     utv210_init_cfg();
     smdkc110_detect_lcd();
     smdkc110_detect_camera();
+    smdkc110_detect_pdevs();
 
 	s3c_usb_set_serial();
 	platform_add_devices(smdkc110_devices, ARRAY_SIZE(smdkc110_devices));
