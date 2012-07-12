@@ -1185,6 +1185,18 @@ config VIDEO_HM2055
 	---help---
 	  This driver supports HM2055 SoC camera module
 
+config VIDEO_GC0308
+	bool "GC0308 Camera Sensor"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This driver supports GC0308 SoC camera module
+
+config VIDEO_HI704
+	bool "HI704 Camera Sensor"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This driver supports HI704 SoC camera module
+
 source "drivers/media/video/samsung/Kconfig"
 
 endif # VIDEO_CAPTURE_DRIVERS

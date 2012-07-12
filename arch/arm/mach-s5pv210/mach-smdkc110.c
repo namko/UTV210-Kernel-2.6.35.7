@@ -970,9 +970,35 @@ static struct utvcam_platform_data cam_hm2055_plat = {
 	.is_mipi = 0,
 };
 
+static struct utvcam_platform_data cam_gc0308_plat = {
+	.default_width = 640,
+	.default_height = 480,
+	.pixelformat = V4L2_PIX_FMT_YUYV,
+	.freq = 24000000,
+	.is_mipi = 0,
+};
+
+static struct utvcam_platform_data cam_hi704_plat = {
+	.default_width = 640,
+	.default_height = 480,
+	.pixelformat = V4L2_PIX_FMT_YUYV,
+	.freq = 24000000,
+	.is_mipi = 0,
+};
+
 static struct i2c_board_info cam_hm2055_i2c_info = {
 	I2C_BOARD_INFO("hm2055", 0x48 >> 1),
 	.platform_data = &cam_hm2055_plat,
+};
+
+static struct i2c_board_info cam_gc0308_i2c_info = {
+	I2C_BOARD_INFO("gc0308", 0x42 >> 1),
+	.platform_data = &cam_gc0308_plat,
+};
+
+static struct i2c_board_info cam_hi704_i2c_info = {
+	I2C_BOARD_INFO("hi704", 0x60 >> 1),
+	.platform_data = &cam_hi704_plat,
 };
 
 static struct s3c_platform_camera cam_hm2055 = {
@@ -1005,6 +1031,66 @@ static struct s3c_platform_camera cam_hm2055 = {
 	.cam_power		= utvcam_power_en,
 };
 
+static struct s3c_platform_camera cam_gc0308 = {
+	.id				= CAMERA_PAR_A,
+	.type			= CAM_TYPE_ITU,
+	.fmt			= ITU_601_YCBCR422_8BIT,
+	.order422		= CAM_ORDER422_8BIT_CBYCRY,
+	.pixelformat	= V4L2_PIX_FMT_YUYV,
+	.i2c_busnum		= 1,
+	.info			= &cam_gc0308_i2c_info,
+	.srclk_name		= "mout_mpll",
+	.clk_name		= "sclk_cam1",
+	.clk_rate		= 24000000,
+	.line_length	= 640,
+	.width			= 640,
+	.height			= 480,
+	.window	= {
+		.left		= 0,
+		.top		= 0,
+		.width		= 640,
+		.height		= 480,
+	},
+
+	.inv_pclk		= 0,
+	.inv_vsync		= 1,
+	.inv_href		= 0,
+	.inv_hsync		= 0,
+
+	.initialized	= 0,
+	.cam_power		= utvcam_power_en,
+};
+
+static struct s3c_platform_camera cam_hi704 = {
+	.id				= CAMERA_PAR_A,
+	.type			= CAM_TYPE_ITU,
+	.fmt			= ITU_601_YCBCR422_8BIT,
+	.order422		= CAM_ORDER422_8BIT_YCBYCR,
+	.pixelformat	= V4L2_PIX_FMT_YUYV,
+	.i2c_busnum		= 1,
+	.info			= &cam_hi704_i2c_info,
+	.srclk_name		= "mout_mpll",
+	.clk_name		= "sclk_cam1",
+	.clk_rate		= 24000000,
+	.line_length	= 640,
+	.width			= 640,
+	.height			= 480,
+	.window	= {
+		.left		= 16,
+		.top		= 0,
+		.width		= 624,
+		.height		= 480,
+	},
+
+	.inv_pclk		= 0,
+	.inv_vsync		= 1,
+	.inv_href		= 0,
+	.inv_hsync		= 0,
+
+	.initialized	= 0,
+	.cam_power		= utvcam_power_en,
+};
+
 /* Interface setting */
 static struct s3c_platform_fimc fimc_plat_lsi = {
 	.srclk_name		= "mout_mpll",
@@ -1022,6 +1108,14 @@ static void smdkc110_detect_camera(void) {
         // Himax HM2055
         printk("Selecting 2MP camera...\n");
         fimc_plat_lsi.camera[0] = &cam_hm2055;
+    } else if (!strcmp(g_Camera, "gc0308")) {
+        // Galaxycore GC0308
+        printk("Selecting 0.3MP camera...\n");
+        fimc_plat_lsi.camera[0] = &cam_gc0308;
+    } else if (!strcmp(g_Camera, "hi704")) {
+        // Hynix HI704
+        printk("Selecting 0.3MP camera...\n");
+        fimc_plat_lsi.camera[0] = &cam_hi704;
     } else {
         printk("*** WARNING: cannot determine camera; camera will not work ***");
     }
