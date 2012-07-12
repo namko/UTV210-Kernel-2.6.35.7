@@ -66,7 +66,7 @@ static inline struct hm2055_state *to_state(struct v4l2_subdev *sd) {
 
 /*
  * HM2055 register structure : 2bytes address, 1bytes value
- * retry on write failure up-to 7 times
+ * retry on write failure up-to 3 times
  */
 static inline int hm2055_write(struct v4l2_subdev *sd, u16 addr, u8 val) {
     struct i2c_client *client = v4l2_get_subdevdata(sd);
@@ -92,8 +92,8 @@ again:
     if (err >= 0)
         return err;    /* Returns here on success */
 
-    /* abnormal case: retry 7 times */
-    if (retry < 7) {
+    /* abnormal case: retry 3 times */
+    if (retry < 3) {
         dev_err(&client->dev, "%s: address: 0x%02x%02x, "
             "value: 0x%02x\n", __func__,
             reg[0], reg[1], reg[2]);
