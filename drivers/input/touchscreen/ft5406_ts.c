@@ -538,7 +538,8 @@ static int ft5406_ts_probe(struct i2c_client *client, const struct i2c_device_id
 {
     struct ft5406_ts_data *ft5406_ts;
     struct input_dev *input_dev;
-    u8 auOEMVoodoos[]={0xF5,  0x3c, 0x01, 0xC1};
+    u8 auOEMVoodoos1[]={0x88, 0x05};
+    u8 auOEMVoodoos2[]={0x80, 0x1E};
     int nGPIOWake, nGPIOPowerUp;
     int err = 0;
 
@@ -686,8 +687,9 @@ static int ft5406_ts_probe(struct i2c_client *client, const struct i2c_device_id
     msleep(350);
 
 
-    dev_dbg(&this_client->dev, "attempting to activate ctpm device *work-mode with voodoos,, writing 0x3c, 0x01, 0xC1 to register 0xF5\n");
-    if ((err=ft5406_i2c_txdata(auOEMVoodoos, sizeof(auOEMVoodoos))) < 0)
+    dev_dbg(&this_client->dev, "attempting to activate ctpm device *work-mode with voodoos, writing 0x05 to register 0x88 and 0x1E to register 0x80\n");
+    if ((err=ft5406_i2c_txdata(auOEMVoodoos1, sizeof(auOEMVoodoos1))) < 0 ||
+            (err=ft5406_i2c_txdata(auOEMVoodoos2, sizeof(auOEMVoodoos2))) < 0)
     {
         dev_err(&client->dev,"attempt to activate ctpm device *work-mode with voodoos failed with err[%d]\n", err);
         goto exit_activate_ft5406_workmode_failed;
