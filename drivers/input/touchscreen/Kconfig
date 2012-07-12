@@ -124,6 +124,14 @@ config TOUCHSCREEN_ADC1
               S5PC11X/S5PV210 has 2 ADC channel for touch screen. Select Y
               to use ADC channel 1
 
+config TOUCHSCREEN_S3C_ICS
+          bool "Android 4.0 compatibility"
+          depends on TOUCHSCREEN_S3C
+          default y
+          help
+              Select Y to enable compatibility with Android 4.0. ICS introduces
+              changes that break GB and older drivers.
+
 config TOUCHSCREEN_FT5406
 	bool "FocalTech ft5406 touchscreen driver"
 	default y

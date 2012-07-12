@@ -61,18 +61,12 @@
 #include <mach/ts-s3c.h>
 #include <mach/irqs.h>
 
-#if defined( CONFIG_T34_REV01) || defined(CONFIG_MACH_SMDKV210)
-//#ifdef CONFIG_SMDKV210_REV01
-
-#define        X_COOR_MIN      180
-#define        X_COOR_MAX      4000
-#define X_COOR_FUZZ	32
-#define        Y_COOR_MIN      300
-#define        Y_COOR_MAX      3700//3900
-#define Y_COOR_FUZZ	32
-
-#endif /* CONFIG_T34_REV01 */
-
+#define X_COOR_MIN      250
+#define X_COOR_MAX      4000
+#define X_COOR_FUZZ     32
+#define Y_COOR_MIN      275
+#define Y_COOR_MAX      3500
+#define Y_COOR_FUZZ     32
 
 /* For ts->dev.id.version */
 #define S3C_TSVERSION	0x0101
@@ -126,12 +120,12 @@ static void touch_timer_fire(unsigned long data)
 		if (ts->count) {
 			x = (int)ts->xp/ts->count;
 			y = (int)ts->yp/ts->count;
-#ifdef CONFIG_FB_S3C_LTE480WV
-			y = 4000 - y;
-#endif
-			input_report_abs(ts->dev, ABS_X, 4160-x);
+
+			input_report_abs(ts->dev, ABS_X, x);
 			input_report_abs(ts->dev, ABS_Y, y);
-			input_report_abs(ts->dev, ABS_Z, 0);
+#ifdef TOUCHSCREEN_S3C_ICS
+			input_report_abs(ts->dev, ABS_PRESSURE, 1);
+#endif
 			input_report_key(ts->dev, BTN_TOUCH, 1);
 			input_sync(ts->dev);
 		}
@@ -149,9 +143,12 @@ static void touch_timer_fire(unsigned long data)
 				ts_base + S3C_ADCCON);
 	} else {
 		ts->count = 0;
-		input_report_abs(ts->dev, ABS_X,4160- ts->xp);
+#ifdef TOUCHSCREEN_S3C_ICS
+		input_report_abs(ts->dev, ABS_PRESSURE, 0);
+#else
+		input_report_abs(ts->dev, ABS_X, ts->xp);
 		input_report_abs(ts->dev, ABS_Y, ts->yp);
-		input_report_abs(ts->dev, ABS_Z, 0);
+#endif
 		input_report_key(ts->dev, BTN_TOUCH, 0);
 		input_sync(ts->dev);
 
