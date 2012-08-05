@@ -753,21 +753,16 @@ static struct s3c_platform_fb utv210_fb_data __initdata = {
 };
 
 static void smdkc110_detect_lcd(void) {
-    if (!strcmp(g_Model, "1024") ||
-            !strcmp(g_Model, "1024n") ||  
-            !strcmp(g_LCD, "lp101") ||
-            !strcmp(g_LCD, "lp101wh1")) {
+    if (!strcmp(g_LCD, "lp101")) {
         // Coby 1024
         printk("Selecting 10.1\" LCD...\n");
         utv210_fb_data.lcd = &lcd_ut10gm;
-    } else if (!strcmp(g_Model, "8024") || 
-            !strcmp(g_LCD, "ut08gm")) {
+    } else if (!strcmp(g_LCD, "ut08gm")) {
         // Coby 8024
         printk("Selecting 8.0\" LCD...\n");
         utv210_fb_data.lcd = &lcd_ut08gm;
-    } else if (!strcmp(g_Model, "703") || 
-            !strcmp(g_LCD, "ut7gm")) {
-        // Herotab C8/Dropad A8/Haipad M7/iBall Slide
+    } else if (!strcmp(g_LCD, "ut7gm")) {
+        // Herotab C8/Dropad A8/Haipad M7/iBall Slide/Coby 7024
         printk("Selecting 7.0\" LCD...\n");
         utv210_fb_data.lcd = &lcd_ut7gm;
     } else {
@@ -1162,6 +1157,14 @@ static struct i2c_board_info i2c_ft5x0x_ts __initdata = {
 	I2C_BOARD_INFO("ft5x0x_ts", (0x70>>1))
 };
 
+static struct i2c_board_info i2c_goodix_ts __initdata = {
+	I2C_BOARD_INFO("Goodix-TS", (0xAA>>1))
+};
+
+static struct i2c_board_info i2c_ata2538 __initdata = {
+	I2C_BOARD_INFO("ata2538", (0xD0>>1))
+};
+
 /* I2C2 */
 static struct i2c_board_info i2c_devs2[] __initdata = {
 	{
@@ -1366,8 +1369,25 @@ static void smdkc110_detect_pdevs(void) {
         if ((ret = platform_device_register(&s3c_device_ts)) != 0)
             printk("*** ERROR: cannot register resistive touchscreen (%d); touch will not work ***\n", ret);
 
+        printk("Selecting touch buttons...\n");
+
+        if ((ret = i2c_register_board_info(1, &i2c_ata2538, 1)) != 0)
+            printk("*** ERROR: cannot register touch buttons (%d); buttons will not work ***\n", ret);
+
         // Use S3C fake battery driver until conflict with the touchscreen is resolved.
         sec_device_battery.name = "sec-fake-battery";
+
+    } else if (!strcmp(g_Model, "1024")) {
+        // Coby 1024
+        printk("Selecting capacitive touchscreen...\n");
+
+        if ((ret = i2c_register_board_info(1, &i2c_goodix_ts, 1)) != 0)
+            printk("*** ERROR: cannot register capacitive touchscreen (%d); touch will not work ***\n", ret);
+
+        printk("Selecting touch buttons...\n");
+
+        if ((ret = i2c_register_board_info(1, &i2c_ata2538, 1)) != 0)
+            printk("*** ERROR: cannot register touch buttons (%d); buttons will not work ***\n", ret);
 
     } else {
         printk("*** WARNING: unknwon model; some devices will not work ***\n");

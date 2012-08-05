@@ -204,6 +204,8 @@ struct proc_dir_entry proc_root = {
 	.parent		= &proc_root,
 };
 
+EXPORT_SYMBOL(proc_root);
+
 int pid_ns_prepare_proc(struct pid_namespace *ns)
 {
 	struct vfsmount *mnt;
