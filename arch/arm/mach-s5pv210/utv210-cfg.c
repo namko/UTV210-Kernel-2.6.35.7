@@ -6,6 +6,7 @@
 char g_LCD[16];
 char g_Model[16];
 char g_Camera[16];
+char g_Manufacturer[16];
 
 static void getCmdLineEntry(char *name, char *out, unsigned int size) {
     const char *cmd = saved_command_line;
@@ -34,14 +35,12 @@ static void getCmdLineEntry(char *name, char *out, unsigned int size) {
 }
 
 void utv210_init_cfg(void) {
-    char man[16];
-
-    getCmdLineEntry("man", man, sizeof(man));
+    getCmdLineEntry("man", g_Manufacturer, sizeof(g_Manufacturer));
     getCmdLineEntry("lcd", g_LCD, sizeof(g_LCD));
     getCmdLineEntry("utmodel", g_Model, sizeof(g_Model));
     getCmdLineEntry("camera", g_Camera, sizeof(g_Camera));
 
-    if (!strcmp(man, "coby")) {
+    if (!strcmp(g_Manufacturer, "coby")) {
         // For all Coby models, "utmodel" entry may be absent, and "ts"
         // may be present in it's place.
         if (strlen(g_Model) == 0)
@@ -64,6 +63,6 @@ void utv210_init_cfg(void) {
         }
     }
 
-    printk("Got lcd=%s, utmodel=%s, camera=%s...\n", g_LCD, g_Model, g_Camera);
+    printk("Got lcd=%s, utmodel=%s, camera=%s, man=%s...\n", g_LCD, g_Model, g_Camera, g_Manufacturer);
 }
 

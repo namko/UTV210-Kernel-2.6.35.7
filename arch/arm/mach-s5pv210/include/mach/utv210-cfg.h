@@ -4,6 +4,7 @@
 extern char g_LCD[];
 extern char g_Model[];
 extern char g_Camera[];
+extern char g_Manufacturer[];
 
 extern void utv210_init_cfg(void);
 
