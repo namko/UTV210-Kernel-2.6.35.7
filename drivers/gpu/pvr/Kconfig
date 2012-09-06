@@ -1,4 +1,3 @@
-
 config PVR_SGX
 	tristate "PowerVR SGX support"
 	depends on ARCH_S5PV210
@@ -7,16 +6,6 @@ config PVR_SGX
 
 	  To compile this driver as a module, choose M here:
 	  this will generate two modules, called pvrsrvkm and s3c_lcd.
-
-choice
-	prompt "PowerVR SGX core"
-	depends on PVR_SGX
-	default PVR_SGXCORE_540
-
-config PVR_SGXCORE_540
-	bool "SGX 540"
-
-endchoice
 
 choice
 	prompt "PowerVR build type"
@@ -102,3 +91,17 @@ config PVR_PDUMP
 	bool "Support for parameter dumping (Pdump)"
 	depends on PVR_SGX
 	default n
+
+config PVR_LINUX_MEM_AREA_POOL
+	bool "Enable uncached allocation pool"
+	depends on PVR_SGX
+	default n
+
+config PVR_LINUX_MEM_AREA_POOL_MAX_PAGES
+	int "Maximum number of pages in pool"
+	depends on PVR_LINUX_MEM_AREA_POOL
+	default 5400
+	help
+		Pool size in pages.
+		A size of 0 disables the pool.
+		A size of -1 allows the pool to grow indefinitely.

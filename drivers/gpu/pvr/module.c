@@ -79,6 +79,10 @@
 #include <asm/uaccess.h>
 #endif
 
+#if defined(PVR_LDM_MODULE) || defined(PVR_DRI_DRM_PLATFORM_DEV)
+#include <asm/atomic.h>
+#endif
+
 #include "img_defs.h"
 #include "services.h"
 #include "kerneldisplay.h"
@@ -99,6 +103,7 @@
 #include "private_data.h"
 #include "lock.h"
 #include "linkage.h"
+#include "buffer_manager.h"
 
 #if defined(SUPPORT_DRI_DRM)
 #include "pvr_drm.h"
@@ -128,6 +133,7 @@ MODULE_PARM_DESC(gPVRDebugLevel, "Sets the level of debug output (default 0x7)")
 #include <linux/omap_ion.h>
 extern struct ion_device *omap_ion_device;
 struct ion_client *gpsIONClient;
+EXPORT_SYMBOL(gpsIONClient);
 #endif 
 
  
@@ -160,10 +166,6 @@ IMG_UINT32 gui32ReleasePID;
 
 #if defined(DEBUG) && defined(PVR_MANUAL_POWER_CONTROL)
 static IMG_UINT32 gPVRPowerLevel;
-#endif
-
-#if defined(SLSI_S5PC110)
-#define SLSI_POWER_GATING
 #endif
 
 #if defined(PVR_LDM_MODULE)
@@ -350,9 +352,17 @@ void PVRSRVDriverShutdown(struct drm_device *pDevice)
 PVR_MOD_STATIC void PVRSRVDriverShutdown(LDM_DEV *pDevice)
 #endif
 {
+	static atomic_t sDriverIsShutdown = ATOMIC_INIT(1);
+
 	PVR_TRACE(("PVRSRVDriverShutdown(pDevice=%p)", pDevice));
 
-	(void) PVRSRVSetPowerStateKM(PVRSRV_SYS_POWER_STATE_D3);
+	if (atomic_dec_and_test(&sDriverIsShutdown))
+	{
+		
+		LinuxLockMutex(&gPVRSRVLock);
+
+		(void) PVRSRVSetPowerStateKM(PVRSRV_SYS_POWER_STATE_D3);
+	}
 }
 
 #endif 
@@ -540,6 +550,12 @@ static int PVRSRVRelease(struct inode unref__ * pInode, struct file *pFile)
 				PVR_DPF((PVR_DBG_ERROR, "%s: Failed to look up export handle", __FUNCTION__));
 				err = -EFAULT;
 				goto err_unlock;
+			}
+
+			
+			if (psKernelMemInfo->sShareMemWorkaround.bInUse)
+			{
+				BM_XProcIndexRelease(psKernelMemInfo->sShareMemWorkaround.ui32ShareIndex);
 			}
 
 			

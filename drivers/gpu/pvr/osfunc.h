@@ -401,6 +401,20 @@ static INLINE IMG_CPU_PHYADDR OSMemHandleToCpuPAddr(IMG_HANDLE hOSMemHandle, IMG
 	return sCpuPAddr;
 }
 #endif
+
+#if defined(__linux__)
+IMG_BOOL OSMemHandleIsPhysContig(IMG_VOID *hOSMemHandle);
+#else
+#ifdef INLINE_IS_PRAGMA
+#pragma inline(OSMemHandleIsPhysContig)
+#endif
+static INLINE IMG_BOOL OSMemHandleIsPhysContig(IMG_HANDLE hOSMemHandle)
+{
+	PVR_UNREFERENCED_PARAMETER(hOSMemHandle);
+	return IMG_FALSE;
+}
+#endif
+
 PVRSRV_ERROR OSInitEnvData(IMG_PVOID *ppvEnvSpecificData);
 PVRSRV_ERROR OSDeInitEnvData(IMG_PVOID pvEnvSpecificData);
 IMG_CHAR* OSStringCopy(IMG_CHAR *pszDest, const IMG_CHAR *pszSrc);
@@ -598,6 +612,33 @@ static INLINE IMG_VOID OSWriteMemoryBarrier(IMG_VOID) { }
 static INLINE IMG_VOID OSMemoryBarrier(IMG_VOID) { }
 
 #endif 
+
+PVRSRV_ERROR OSAtomicAlloc(IMG_PVOID *ppvRefCount);
+IMG_VOID OSAtomicFree(IMG_PVOID pvRefCount);
+IMG_VOID OSAtomicInc(IMG_PVOID pvRefCount);
+IMG_BOOL OSAtomicDecAndTest(IMG_PVOID pvRefCount);
+IMG_UINT32 OSAtomicRead(IMG_PVOID pvRefCount);
+
+PVRSRV_ERROR OSTimeCreateWithUSOffset(IMG_PVOID *pvRet, IMG_UINT32 ui32MSOffset);
+IMG_BOOL OSTimeHasTimePassed(IMG_PVOID pvData);
+IMG_VOID OSTimeDestroy(IMG_PVOID pvData);
+
+#if defined(__linux__)
+IMG_VOID OSReleaseBridgeLock(IMG_VOID);
+IMG_VOID OSReacquireBridgeLock(IMG_VOID);
+#else
+
+#ifdef INLINE_IS_PRAGMA
+#pragma inline(OSReleaseBridgeLock)
+#endif
+static INLINE IMG_VOID OSReleaseBridgeLock(IMG_VOID) { }
+
+#ifdef INLINE_IS_PRAGMA
+#pragma inline(OSReacquireBridgeLock)
+#endif
+static INLINE IMG_VOID OSReacquireBridgeLock(IMG_VOID) { }
+
+#endif
 
 #if defined (__cplusplus)
 }
