@@ -1373,10 +1373,6 @@ static void smdkc110_detect_pdevs(void) {
 
         if ((ret = i2c_register_board_info(1, &i2c_ata2538, 1)) != 0)
             printk("*** ERROR: cannot register touch buttons (%d); buttons will not work ***\n", ret);
-
-        // Use S3C fake battery driver until conflict with the touchscreen is resolved.
-        sec_device_battery.name = "sec-fake-battery";
-
     } else if (!strcmp(g_Model, "1024")) {
         // Coby 1024
         printk("Selecting capacitive touchscreen...\n");

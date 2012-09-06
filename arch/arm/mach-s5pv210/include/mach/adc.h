@@ -32,6 +32,8 @@ struct s3c_adc_mach_info {
 	int resolution;
 };
 
+extern void s3c_adc_lock(void);
+extern void s3c_adc_unlock(void);
 extern int s3c_adc_get_adc_data(int channel);
 void __init s3c_adc_set_platdata(struct s3c_adc_mach_info *pd);
 extern unsigned int get_s3c_adc_convert(int channel);
