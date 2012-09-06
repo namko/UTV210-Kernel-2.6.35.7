@@ -1202,6 +1202,11 @@ struct platform_device sec_device_battery = {
 	.id = -1,
 };
 
+struct platform_device mid_control = {
+	.name   = "mid-control",
+	.id = -1,
+};
+
 #ifdef CONFIG_ANDROID_PMEM
 static struct android_pmem_platform_data pmem_gpu1_pdata = {
 	.name = "pmem_gpu1",
@@ -1318,6 +1323,7 @@ static struct platform_device *smdkc110_devices[] __initdata = {
 #endif
 #endif
 	&sec_device_battery,
+	&mid_control,
 #ifdef CONFIG_S3C_DEV_HSMMC
 	&s3c_device_hsmmc0,
 #endif
