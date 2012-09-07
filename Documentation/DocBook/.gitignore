@@ -1,0 +1,10 @@
+*.xml
+*.ps
+*.html
+*.9.gz
+*.9
+*.aux
+*.dvi
+*.log
+*.out
+media/
