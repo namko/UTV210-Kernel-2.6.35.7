@@ -851,19 +851,16 @@ struct s3c_pwm_data pwm_data[] = {
 
 #if defined(CONFIG_BACKLIGHT_PWM)
 // namko: Change backlight PWM from #3 to #0.
-// But PWM #0 conflicts with s3c-keypad; hence keypad needs to be
-// kept disabled. Other than that, the default brightness is fixed
-// and so is the PWM period (from Asure's port of Mango210 kernel).
 static struct platform_pwm_backlight_data smdk_backlight_data = {
 	.pwm_id  = 0,
 	.max_brightness = 255,
 	.dft_brightness = 127,
-	.pwm_period_ns  = 78770,
+	.pwm_period_ns  = 40000,
 };
 
 static struct platform_device smdk_backlight_device = {
 	.name      = "pwm-backlight",
-	.id        = -1,
+	.id        = 0,
 	.dev        = {
 		.parent = &s3c_device_timer[0].dev,
 		.platform_data = &smdk_backlight_data,
