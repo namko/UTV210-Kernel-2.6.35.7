@@ -660,8 +660,10 @@ int s3cfb_set_buffer_address(struct s3cfb_global *ctrl, int id)
 	u32 shw;
 
 	if (fix->smem_start) {
-		start_addr = fix->smem_start + (var->xres_virtual *
-				(var->bits_per_pixel / 8) * var->yoffset);
+		// namko: Page-align for odd resolutions.
+		// This works as long as yoffset is a multiple of yres.
+		unsigned int frame_size = ALIGN(fix->line_length * var->yres, PAGE_SIZE);
+		start_addr = fix->smem_start + (var->yoffset / var->yres) * frame_size;
 
 		end_addr = start_addr + fix->line_length * var->yres;
 	}
