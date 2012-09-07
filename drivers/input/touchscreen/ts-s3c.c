@@ -62,11 +62,11 @@
 #include <mach/adc.h>
 #include <mach/irqs.h>
 
-#define X_COOR_MIN      250
+#define X_COOR_MIN      180
 #define X_COOR_MAX      4000
 #define X_COOR_FUZZ     32
-#define Y_COOR_MIN      275
-#define Y_COOR_MAX      3500
+#define Y_COOR_MIN      300
+#define Y_COOR_MAX      3700
 #define Y_COOR_FUZZ     32
 
 /* For ts->dev.id.version */
